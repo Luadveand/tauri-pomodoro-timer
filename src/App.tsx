@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SettingsPage from './pages/SettingsPage';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
-import { loadAppData } from './utils/storage';
+import { loadAppData, testStore } from './utils/storage';
 import { initNotifications } from './utils/notifications';
 
 function MainApp() {
@@ -16,6 +16,9 @@ function MainApp() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Test store functionality first
+        await testStore();
+        
         // Load persisted data
         const appData = await loadAppData();
         loadSettings(appData.settings);

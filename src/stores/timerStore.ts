@@ -31,8 +31,8 @@ interface TimerStore {
   setTimeLeft: (time: number) => void;
   completePhase: (settings: Settings) => void;
   nextPhase: (settings: Settings) => void;
-  addHistoryEntry: (entry: HistoryEntry) => void;
-  clearHistory: () => void;
+  addHistoryEntry: (entry: HistoryEntry) => Promise<void>;
+  clearHistory: () => Promise<void>;
   resetCycle: (settings: Settings) => void;
   initializeTimer: (settings: Settings) => void;
   loadHistory: (history: HistoryEntry[]) => void;
@@ -130,15 +130,23 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     });
   },
   
-  addHistoryEntry: (entry) => {
+  addHistoryEntry: async (entry) => {
     const newHistory = [entry, ...get().history];
     set({ history: newHistory });
-    saveHistory(newHistory);
+    try {
+      await saveHistory(newHistory);
+    } catch (error) {
+      console.error('Failed to save history:', error);
+    }
   },
   
-  clearHistory: () => {
+  clearHistory: async () => {
     set({ history: [] });
-    saveHistory([]);
+    try {
+      await saveHistory([]);
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+    }
   },
   
   resetCycle: (settings: Settings) =>

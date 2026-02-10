@@ -13,7 +13,7 @@ export interface Settings {
 
 interface SettingsStore {
   settings: Settings;
-  updateSettings: (newSettings: Partial<Settings>) => void;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   loadSettings: (settings: Settings) => void;
 }
 
@@ -29,10 +29,15 @@ const defaultSettings: Settings = {
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   settings: defaultSettings,
-  updateSettings: (newSettings) => {
+  updateSettings: async (newSettings) => {
     const updatedSettings = { ...get().settings, ...newSettings };
     set({ settings: updatedSettings });
-    saveSettings(updatedSettings);
+    try {
+      await saveSettings(updatedSettings);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      // Optionally, you could show a user notification here
+    }
   },
   loadSettings: (settings) => set({ settings }),
 }));

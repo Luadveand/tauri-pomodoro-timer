@@ -6,6 +6,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Pomodoro Timer",
         "width": 550,
         "height": 320,
@@ -13,7 +14,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": ["default"]
     }
   },
   "build": {
@@ -22,6 +24,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",
