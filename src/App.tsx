@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
@@ -11,6 +11,7 @@ import { initNotifications } from './utils/notifications';
 function MainApp() {
   const { loadSettings } = useSettingsStore();
   const { loadHistory } = useTimerStore();
+  const [showHistory, setShowHistory] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -32,12 +33,17 @@ function MainApp() {
 
   return (
     <div className="flex h-screen bg-deep-navy">
-      <div className="flex-[0.65] border-r border-gray-text/20">
-        <TimerPanel />
+      <div className={`${showHistory ? 'flex-[0.65] border-r border-gray-text/20' : 'flex-1'} transition-all duration-300`}>
+        <TimerPanel 
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory(!showHistory)}
+        />
       </div>
-      <div className="flex-[0.35]">
-        <HistoryPanel />
-      </div>
+      {showHistory && (
+        <div className="flex-[0.35]">
+          <HistoryPanel />
+        </div>
+      )}
     </div>
   );
 }

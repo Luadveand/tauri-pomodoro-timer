@@ -5,7 +5,12 @@ import Controls from './Controls';
 import RoundTracker from './RoundTracker';
 import SettingsModal from './SettingsModal';
 
-const TimerPanel: React.FC = () => {
+interface TimerPanelProps {
+  showHistory: boolean;
+  onToggleHistory: () => void;
+}
+
+const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory }) => {
   const { currentPhase, timeLeft } = useTimerStore();
   const [showSettings, setShowSettings] = useState(false);
   
@@ -33,14 +38,24 @@ const TimerPanel: React.FC = () => {
 
   return (
     <div className="h-full bg-lighter-navy flex flex-col relative">
-      {/* Settings Button */}
-      <div className="absolute top-4 right-4">
+      {/* Control Buttons */}
+      <div className="absolute top-4 right-4 flex gap-2">
+        {/* Settings Button */}
         <button
           onClick={() => setShowSettings(true)}
           className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
           aria-label="Settings"
         >
           <span className="text-off-white text-lg">⚙️</span>
+        </button>
+        
+        {/* History Toggle Button */}
+        <button
+          onClick={onToggleHistory}
+          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+          aria-label={showHistory ? "Hide History" : "Show History"}
+        >
+          <span className="text-off-white text-lg">{showHistory ? "📊" : "📈"}</span>
         </button>
       </div>
 
