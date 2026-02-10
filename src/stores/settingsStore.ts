@@ -14,6 +14,7 @@ export interface Settings {
 interface SettingsStore {
   settings: Settings;
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
+  resetSettings: () => Promise<void>;
   loadSettings: (settings: Settings) => void;
 }
 
@@ -40,4 +41,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
   loadSettings: (settings) => set({ settings }),
+  resetSettings: async () => {
+    set({ settings: defaultSettings });
+    try {
+      await saveSettings(defaultSettings);
+    } catch (error) {
+      console.error('Failed to reset settings:', error);
+    }
+  },
 }));

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore, Settings } from '../stores/settingsStore';
+import { useTimerStore } from '../stores/timerStore';
 import { Window } from '@tauri-apps/api/window';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 const SettingsPage = () => {
-  const { settings, updateSettings } = useSettingsStore();
+  const { settings, updateSettings, resetSettings } = useSettingsStore();
+  const { resetAllData } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
 
   useEffect(() => {
@@ -23,7 +26,7 @@ const SettingsPage = () => {
         value = 1;
       }
     }
-    
+
     setLocalSettings((prev) => ({
       ...prev,
       [key]: value,
@@ -43,6 +46,7 @@ const SettingsPage = () => {
     const currentWindow = Window.getCurrent();
     await currentWindow.close();
   };
+
 
   return (
     <div className="min-h-screen bg-deep-navy p-6">
@@ -162,14 +166,12 @@ const SettingsPage = () => {
             </label>
             <button
               onClick={() => handleChange('soundEnabled', !localSettings.soundEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.soundEnabled ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.soundEnabled ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.soundEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.soundEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
             </button>
           </div>
@@ -181,14 +183,12 @@ const SettingsPage = () => {
             </label>
             <button
               onClick={() => handleChange('notificationsEnabled', !localSettings.notificationsEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.notificationsEnabled ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.notificationsEnabled ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
             </button>
           </div>
@@ -200,18 +200,51 @@ const SettingsPage = () => {
             </label>
             <button
               onClick={() => handleChange('alwaysOnTop', !localSettings.alwaysOnTop)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.alwaysOnTop ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.alwaysOnTop ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.alwaysOnTop ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.alwaysOnTop ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
             </button>
           </div>
+
+          {/* Danger Zone */}
+          <div className="pt-6 mt-6 border-t border-gray-text/20">
+            <h3 className="text-lg font-medium text-tomato mb-4">Danger Zone</h3>
+            <button
+              onClick={async () => {
+                try {
+                  const confirmed = await ask('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.', {
+                    title: 'Reset App Data',
+                    kind: 'warning'
+                  });
+                  
+                  if (confirmed) {
+                    await resetAllData();
+                    resetSettings(); // Reset settings to default values
+                    const currentWindow = Window.getCurrent();
+                    await currentWindow.close();
+                  }
+                } catch (error) {
+                  // Fallback to browser confirm if Tauri dialog fails
+                  const confirmed = window.confirm('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.');
+                  if (confirmed) {
+                    await resetAllData();
+                    resetSettings(); // Reset settings to default values
+                    const currentWindow = Window.getCurrent();
+                    await currentWindow.close();
+                  }
+                }
+              }}
+              className="px-4 py-2 border border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200"
+            >
+              Reset App Data
+            </button>
+          </div>
         </div>
+
 
         {/* Footer */}
         <div className="mt-8 flex justify-end gap-3">

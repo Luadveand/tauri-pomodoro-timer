@@ -1,6 +1,6 @@
 import { Store } from '@tauri-apps/plugin-store';
 import { Settings } from '../stores/settingsStore';
-import { HistoryEntry } from '../stores/timerStore';
+import { HistoryEntry } from '../types';
 
 let store: Store | null = null;
 
@@ -46,10 +46,10 @@ export const loadAppData = async (): Promise<AppData> => {
     const storeInstance = await getStore();
     const settings = await storeInstance.get<Settings>('settings');
     const history = await storeInstance.get<HistoryEntry[]>('history');
-    
+
     console.log('Loaded settings:', settings);
     console.log('Loaded history length:', history?.length || 0);
-    
+
     return {
       settings: settings || defaultData.settings,
       history: history || defaultData.history,
@@ -76,13 +76,16 @@ export const saveSettings = async (settings: Settings): Promise<void> => {
 
 export const saveHistory = async (history: HistoryEntry[]): Promise<void> => {
   try {
-    console.log('Saving history, length:', history.length);
+    console.log('[Storage] saveHistory called with', history.length, 'entries');
+    console.log('[Storage] History IDs:', history.map(h => h.id));
     const storeInstance = await getStore();
+    console.log('[Storage] Got store instance, setting history...');
     await storeInstance.set('history', history);
+    console.log('[Storage] History set in store, saving...');
     await storeInstance.save();
-    console.log('History saved successfully');
+    console.log('[Storage] History saved successfully to persistent storage');
   } catch (error) {
-    console.error('Error saving history:', error);
+    console.error('[Storage] Error saving history:', error);
     throw error; // Re-throw to allow callers to handle the error
   }
 };
@@ -97,6 +100,19 @@ export const clearHistory = async (): Promise<void> => {
   }
 };
 
+export const clearAllData = async (): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.clear();
+    await storeInstance.save();
+    console.log('All data cleared successfully');
+  } catch (error) {
+    console.error('Error clearing all data:', error);
+    throw error;
+  }
+};
+
+
 // Debug function to test store functionality
 export const testStore = async (): Promise<void> => {
   console.log('=== TESTING STORE FUNCTIONALITY ===');
@@ -105,23 +121,23 @@ export const testStore = async (): Promise<void> => {
     console.log('Attempting to load store directly...');
     const storeInstance = await Store.load('test-store.dat');
     console.log('Store instance created successfully');
-    
+
     // Test setting a value
     await storeInstance.set('test', 'hello world');
     console.log('Test value set');
-    
+
     // Test saving
     await storeInstance.save();
     console.log('Store saved successfully');
-    
+
     // Test getting the value
     const value = await storeInstance.get('test');
     console.log('Retrieved test value:', value);
-    
+
     // Test getting all keys
     const keys = await storeInstance.keys();
     console.log('All store keys:', keys);
-    
+
     console.log('=== STORE TEST COMPLETED SUCCESSFULLY ===');
   } catch (error) {
     console.error('=== STORE TEST FAILED ===', error);

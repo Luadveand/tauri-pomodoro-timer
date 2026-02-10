@@ -1,5 +1,5 @@
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { Phase } from '../stores/timerStore';
+import { Phase } from '../types';
 
 export const initNotifications = async (): Promise<boolean> => {
   try {

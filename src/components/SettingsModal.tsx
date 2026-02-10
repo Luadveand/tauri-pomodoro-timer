@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useSettingsStore, Settings } from '../stores/settingsStore';
+import { useTimerStore } from '../stores/timerStore';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
-  const { settings, updateSettings } = useSettingsStore();
+  const { settings, updateSettings, resetSettings } = useSettingsStore();
+  const { resetAllData } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
 
   const handleChange = (key: keyof Settings, value: number | boolean) => {
@@ -22,7 +25,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         value = 1;
       }
     }
-    
+
     setLocalSettings((prev) => ({
       ...prev,
       [key]: value,
@@ -38,6 +41,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setLocalSettings(settings);
     onClose();
   };
+
 
   return (
     <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -157,14 +161,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </label>
             <button
               onClick={() => handleChange('soundEnabled', !localSettings.soundEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.soundEnabled ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.soundEnabled ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.soundEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.soundEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
             </button>
           </div>
@@ -176,14 +178,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </label>
             <button
               onClick={() => handleChange('notificationsEnabled', !localSettings.notificationsEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.notificationsEnabled ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.notificationsEnabled ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
             </button>
           </div>
@@ -195,15 +195,45 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </label>
             <button
               onClick={() => handleChange('alwaysOnTop', !localSettings.alwaysOnTop)}
-              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${
-                localSettings.alwaysOnTop ? 'bg-tomato' : 'bg-gray-text/30'
-              }`}
+              className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.alwaysOnTop ? 'bg-tomato' : 'bg-gray-text/30'
+                }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${
-                  localSettings.alwaysOnTop ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.alwaysOnTop ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
               />
+            </button>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="pt-4 mt-4 border-t border-gray-text/20">
+            <h3 className="text-sm font-medium text-tomato mb-2">Danger Zone</h3>
+            <button
+              onClick={async () => {
+                try {
+                  const confirmed = await ask('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.', {
+                    title: 'Reset App Data',
+                    kind: 'warning'
+                  });
+                  
+                  if (confirmed) {
+                    await resetAllData();
+                    resetSettings(); // Reset settings to default values
+                    onClose();
+                  }
+                } catch (error) {
+                  // Fallback to browser confirm if Tauri dialog fails
+                  const confirmed = window.confirm('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.');
+                  if (confirmed) {
+                    await resetAllData();
+                    resetSettings(); // Reset settings to default values
+                    onClose();
+                  }
+                }
+              }}
+              className="w-full px-4 py-2 border border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200 text-sm"
+            >
+              Reset App Data
             </button>
           </div>
         </div>

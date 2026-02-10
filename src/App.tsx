@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
+import DebugPanel, { debugLogger } from './components/DebugPanel';
 import SettingsPage from './pages/SettingsPage';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
@@ -16,18 +17,23 @@ function MainApp() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        debugLogger.log('App initializing...');
         // Test store functionality first
         await testStore();
+        debugLogger.log('Store test completed');
         
         // Load persisted data
         const appData = await loadAppData();
         loadSettings(appData.settings);
         loadHistory(appData.history);
+        debugLogger.log(`Loaded ${appData.history.length} history entries`);
         
         // Initialize notifications
         await initNotifications();
+        debugLogger.log('App initialization complete');
       } catch (error) {
         console.error('Error initializing app:', error);
+        debugLogger.log('Error initializing app: ' + error, 'error');
       }
     };
 
@@ -47,6 +53,7 @@ function MainApp() {
           <HistoryPanel />
         </div>
       )}
+      <DebugPanel />
     </div>
   );
 }

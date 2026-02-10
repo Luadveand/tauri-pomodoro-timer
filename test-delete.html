@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delete Functionality Test</title>
+</head>
+<body>
+    <h1>Delete Functionality Test</h1>
+    <p>Open your browser's developer console to see the test results</p>
+    
+    <script>
+        // Test the delete functionality logic
+        console.log('=== Testing Delete Functionality ===');
+        
+        // Mock data similar to what the app uses
+        const mockHistory = [
+            { id: 'test-1', timestamp: '2024-01-01T10:00:00Z', phase: 'focus', durationMinutes: 25, status: 'completed' },
+            { id: 'test-2', timestamp: '2024-01-01T11:00:00Z', phase: 'shortBreak', durationMinutes: 5, status: 'completed' },
+            { id: 'test-3', timestamp: '2024-01-01T12:00:00Z', phase: 'focus', durationMinutes: 25, status: 'completed' }
+        ];
+        
+        console.log('Initial history:', mockHistory);
+        console.log('Initial length:', mockHistory.length);
+        
+        // Test filtering (this is what the delete function does)
+        const idToDelete = 'test-2';
+        const filteredHistory = mockHistory.filter(entry => entry.id !== idToDelete);
+        
+        console.log('After deleting ID:', idToDelete);
+        console.log('Filtered history:', filteredHistory);
+        console.log('New length:', filteredHistory.length);
+        console.log('Entry found in original:', mockHistory.some(e => e.id === idToDelete));
+        console.log('Entry found in filtered:', filteredHistory.some(e => e.id === idToDelete));
+        
+        // Test with invalid ID
+        const invalidId = 'non-existent';
+        const filteredWithInvalid = mockHistory.filter(entry => entry.id !== invalidId);
+        console.log('\nTesting with invalid ID:', invalidId);
+        console.log('Length unchanged:', filteredWithInvalid.length === mockHistory.length);
+        
+        console.log('=== Delete Logic Test Complete ===');
+    </script>
+</body>
+</html>

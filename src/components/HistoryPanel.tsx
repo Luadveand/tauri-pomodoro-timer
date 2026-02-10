@@ -1,27 +1,54 @@
 import React from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import HistoryEntry from './HistoryEntry';
+import { debugLogger } from './DebugPanel';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 const HistoryPanel: React.FC = () => {
-  const { history, clearHistory } = useTimerStore();
+  const { history, clearHistory, deleteHistoryEntry } = useTimerStore();
+  
 
-  const handleClearHistory = () => {
-    if (history.length > 0 && window.confirm('Are you sure you want to clear all history?')) {
-      clearHistory();
+  const handleClearHistory = async () => {
+    if (history.length === 0) return;
+    
+    try {
+      const confirmed = await ask('Are you sure you want to clear all history? This action cannot be undone.', {
+        title: 'Clear All History',
+        kind: 'warning'
+      });
+      
+      if (confirmed) {
+        clearHistory();
+      }
+    } catch (error) {
+      // Fallback to browser confirm if Tauri dialog fails
+      const confirmed = window.confirm('Are you sure you want to clear all history? This action cannot be undone.');
+      if (confirmed) {
+        clearHistory();
+      }
     }
   };
 
+  const handleDeleteEntry = (id: string) => {
+    try {
+      deleteHistoryEntry(id);
+    } catch (error) {
+      console.error('Error deleting history entry:', error);
+    }
+  };
+
+
   const groupedHistory = React.useMemo(() => {
     const groups: { [key: string]: typeof history } = {};
-    
+
     history.forEach((entry) => {
       const date = new Date(entry.timestamp);
       const today = new Date();
       const yesterday = new Date();
       yesterday.setDate(today.getDate() - 1);
-      
+
       let dateKey: string;
-      
+
       if (date.toDateString() === today.toDateString()) {
         dateKey = 'Today';
       } else if (date.toDateString() === yesterday.toDateString()) {
@@ -33,13 +60,13 @@ const HistoryPanel: React.FC = () => {
           year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
         });
       }
-      
+
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
       groups[dateKey].push(entry);
     });
-    
+
     return groups;
   }, [history]);
 
@@ -76,7 +103,11 @@ const HistoryPanel: React.FC = () => {
                 </div>
                 {/* Entries */}
                 {entries.map((entry) => (
-                  <HistoryEntry key={entry.id} entry={entry} />
+                  <HistoryEntry
+                    key={entry.id}
+                    entry={entry}
+                    onDelete={handleDeleteEntry}
+                  />
                 ))}
               </div>
             ))}
