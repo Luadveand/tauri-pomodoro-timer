@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTimerStore } from '../stores/timerStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { useTimer } from '../utils/useTimer';
 import Controls from './Controls';
 import RoundTracker from './RoundTracker';
@@ -11,7 +12,8 @@ interface TimerPanelProps {
 }
 
 const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory }) => {
-  const { currentPhase, timeLeft } = useTimerStore();
+  const { currentPhase, timeLeft, resetCycle } = useTimerStore();
+  const { settings } = useSettingsStore();
   const [showSettings, setShowSettings] = useState(false);
   
   // Initialize timer logic
@@ -36,8 +38,23 @@ const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory })
     }
   };
 
+  const handleRestartCycle = () => {
+    resetCycle(settings);
+  };
+
   return (
     <div className="h-full bg-lighter-navy flex flex-col relative">
+      {/* Restart Button */}
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={handleRestartCycle}
+          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+          aria-label="Restart Cycle"
+        >
+          <span className="text-off-white text-lg">🔄</span>
+        </button>
+      </div>
+
       {/* Control Buttons */}
       <div className="absolute top-4 right-4 flex gap-2">
         {/* Settings Button */}
