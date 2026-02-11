@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
 import DebugPanel, { debugLogger } from './components/DebugPanel';
-import SettingsPage from './pages/SettingsPage';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
 import { loadAppData, testStore } from './utils/storage';
@@ -59,14 +57,7 @@ function MainApp() {
 }
 
 function App() {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<MainApp />} />
-        <Route path="/settings" element={<SettingsPage />} />
-      </Routes>
-    </Router>
-  );
+  return <MainApp />;
 }
 
 export default App;

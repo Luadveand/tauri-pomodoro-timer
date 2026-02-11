@@ -1,33 +1,9 @@
 import React from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import HistoryEntry from './HistoryEntry';
-import { debugLogger } from './DebugPanel';
-import { ask } from '@tauri-apps/plugin-dialog';
 
 const HistoryPanel: React.FC = () => {
-  const { history, clearHistory, deleteHistoryEntry } = useTimerStore();
-  
-
-  const handleClearHistory = async () => {
-    if (history.length === 0) return;
-    
-    try {
-      const confirmed = await ask('Are you sure you want to clear all history? This action cannot be undone.', {
-        title: 'Clear All History',
-        kind: 'warning'
-      });
-      
-      if (confirmed) {
-        clearHistory();
-      }
-    } catch (error) {
-      // Fallback to browser confirm if Tauri dialog fails
-      const confirmed = window.confirm('Are you sure you want to clear all history? This action cannot be undone.');
-      if (confirmed) {
-        clearHistory();
-      }
-    }
-  };
+  const { history, deleteHistoryEntry } = useTimerStore();
 
   const handleDeleteEntry = (id: string) => {
     try {
@@ -74,17 +50,7 @@ const HistoryPanel: React.FC = () => {
     <div className="h-full bg-lighter-navy flex flex-col">
       {/* Header */}
       <div className="px-4 py-2 border-b border-gray-text/20">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-off-white">History</h3>
-          {history.length > 0 && (
-            <button
-              onClick={handleClearHistory}
-              className="text-xs text-gray-text hover:text-tomato transition-colors duration-200"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        <h3 className="text-lg font-medium text-off-white">History</h3>
       </div>
 
       {/* History List */}

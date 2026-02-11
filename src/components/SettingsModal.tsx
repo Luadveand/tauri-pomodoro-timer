@@ -9,8 +9,9 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const { settings, updateSettings, resetSettings } = useSettingsStore();
-  const { resetAllData } = useTimerStore();
+  const { resetAllData, clearHistory } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
+  const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
 
   const handleChange = (key: keyof Settings, value: number | boolean) => {
     // Validate numeric inputs to ensure minimum value of 1
@@ -40,6 +41,84 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const handleCancel = () => {
     setLocalSettings(settings);
     onClose();
+  };
+
+  const handleRestoreDefaults = async () => {
+    try {
+      const confirmed = await ask('Are you sure you want to restore all timer settings to their default values? This will not affect your history.', {
+        title: 'Restore Default Times',
+        kind: 'warning'
+      });
+      
+      if (confirmed) {
+        await resetSettings();
+        const defaultSettings = {
+          focusDuration: 25,
+          shortBreakDuration: 5,
+          longBreakDuration: 15,
+          roundsBeforeLongBreak: 4,
+          soundEnabled: true,
+          notificationsEnabled: true,
+          alwaysOnTop: false,
+        };
+        setLocalSettings(defaultSettings);
+      }
+    } catch (error) {
+      const confirmed = window.confirm('Are you sure you want to restore all timer settings to their default values? This will not affect your history.');
+      if (confirmed) {
+        await resetSettings();
+        const defaultSettings = {
+          focusDuration: 25,
+          shortBreakDuration: 5,
+          longBreakDuration: 15,
+          roundsBeforeLongBreak: 4,
+          soundEnabled: true,
+          notificationsEnabled: true,
+          alwaysOnTop: false,
+        };
+        setLocalSettings(defaultSettings);
+      }
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      const confirmed = await ask('Are you sure you want to clear all history? This action cannot be undone.', {
+        title: 'Clear All History',
+        kind: 'warning'
+      });
+      
+      if (confirmed) {
+        clearHistory();
+      }
+    } catch (error) {
+      const confirmed = window.confirm('Are you sure you want to clear all history? This action cannot be undone.');
+      if (confirmed) {
+        clearHistory();
+      }
+    }
+  };
+
+  const handleResetAppData = async () => {
+    try {
+      const confirmed = await ask('Are you sure you want to reset all app data? This will clear your history and reset all settings to default values. This action cannot be undone.', {
+        title: 'Reset App Data',
+        kind: 'warning'
+      });
+      
+      if (confirmed) {
+        await resetAllData();
+        resetSettings();
+        onClose();
+      }
+    } catch (error) {
+      const confirmed = window.confirm('Are you sure you want to reset all app data? This will clear your history and reset all settings to default values. This action cannot be undone.');
+      if (confirmed) {
+        await resetAllData();
+        resetSettings();
+        onClose();
+      }
+    }
   };
 
 
@@ -209,34 +288,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
           {/* Danger Zone */}
           <div className="pt-4 mt-4 border-t border-gray-text/20">
-            <h3 className="text-sm font-medium text-tomato mb-2">Danger Zone</h3>
             <button
-              onClick={async () => {
-                try {
-                  const confirmed = await ask('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.', {
-                    title: 'Reset App Data',
-                    kind: 'warning'
-                  });
-                  
-                  if (confirmed) {
-                    await resetAllData();
-                    resetSettings(); // Reset settings to default values
-                    onClose();
-                  }
-                } catch (error) {
-                  // Fallback to browser confirm if Tauri dialog fails
-                  const confirmed = window.confirm('Are you sure you want to reset all data? This will clear your history and reset all settings. This action cannot be undone.');
-                  if (confirmed) {
-                    await resetAllData();
-                    resetSettings(); // Reset settings to default values
-                    onClose();
-                  }
-                }
-              }}
-              className="w-full px-4 py-2 border border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200 text-sm"
+              onClick={() => setIsDangerZoneOpen(!isDangerZoneOpen)}
+              className="flex items-center justify-between w-full text-left mb-2"
             >
-              Reset App Data
+              <h3 className="text-sm font-medium text-tomato">Danger Zone</h3>
+              <svg
+                className={`w-4 h-4 text-tomato transform transition-transform duration-200 ${
+                  isDangerZoneOpen ? 'rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
+            
+            {isDangerZoneOpen && (
+              <div className="space-y-2">
+                <button
+                  onClick={handleRestoreDefaults}
+                  className="w-full px-3 py-2 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-md transition-colors duration-200 text-xs"
+                >
+                  Restore Default Times
+                </button>
+                
+                <button
+                  onClick={handleClearHistory}
+                  className="w-full px-3 py-2 border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white rounded-md transition-colors duration-200 text-xs"
+                >
+                  Clear History
+                </button>
+                
+                <button
+                  onClick={handleResetAppData}
+                  className="w-full px-3 py-2 border border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200 text-xs"
+                >
+                  Reset App Data
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

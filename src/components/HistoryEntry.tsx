@@ -1,6 +1,5 @@
 import React from 'react';
 import { HistoryEntry as HistoryEntryType } from '../types';
-import { debugLogger } from './DebugPanel';
 import { ask } from '@tauri-apps/plugin-dialog';
 
 interface HistoryEntryProps {

@@ -5,7 +5,6 @@ import { playNotificationSound } from '../utils/sound';
 import { sendPhaseNotification } from '../utils/notifications';
 import { saveHistory, clearAllData } from '../utils/storage';
 import { Phase, TimerStatus, HistoryEntry } from '../types';
-import { debugLogger } from '../components/DebugPanel';
 
 interface TimerStore {
   currentPhase: Phase;
