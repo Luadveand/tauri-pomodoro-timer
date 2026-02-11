@@ -60,6 +60,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           soundEnabled: true,
           notificationsEnabled: true,
           alwaysOnTop: false,
+          debugPanelEnabled: false,
         };
         setLocalSettings(defaultSettings);
       }
@@ -75,6 +76,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           soundEnabled: true,
           notificationsEnabled: true,
           alwaysOnTop: false,
+          debugPanelEnabled: false,
         };
         setLocalSettings(defaultSettings);
       }
@@ -327,6 +329,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 >
                   Reset App Data
                 </button>
+
+                {/* Debug Panel Toggle */}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-blue-400">
+                    Debug Panel
+                  </label>
+                  <button
+                    onClick={() => handleChange('debugPanelEnabled', !localSettings.debugPanelEnabled)}
+                    className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.debugPanelEnabled ? 'bg-blue-500' : 'bg-gray-text/30'
+                      }`}
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.debugPanelEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                        }`}
+                    />
+                  </button>
+                </div>
               </div>
             )}
           </div>

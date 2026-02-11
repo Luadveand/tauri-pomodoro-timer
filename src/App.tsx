@@ -8,7 +8,7 @@ import { loadAppData, testStore } from './utils/storage';
 import { initNotifications } from './utils/notifications';
 
 function MainApp() {
-  const { loadSettings } = useSettingsStore();
+  const { loadSettings, settings } = useSettingsStore();
   const { loadHistory } = useTimerStore();
   const [showHistory, setShowHistory] = useState(true);
 
@@ -51,7 +51,7 @@ function MainApp() {
           <HistoryPanel />
         </div>
       )}
-      <DebugPanel />
+      {settings.debugPanelEnabled && <DebugPanel />}
     </div>
   );
 }

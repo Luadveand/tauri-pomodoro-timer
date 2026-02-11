@@ -9,6 +9,7 @@ export interface Settings {
   soundEnabled: boolean;
   notificationsEnabled: boolean;
   alwaysOnTop: boolean;
+  debugPanelEnabled: boolean;
 }
 
 interface SettingsStore {
@@ -26,6 +27,7 @@ const defaultSettings: Settings = {
   soundEnabled: true,
   notificationsEnabled: true,
   alwaysOnTop: false,
+  debugPanelEnabled: false,
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
