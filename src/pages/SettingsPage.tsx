@@ -18,10 +18,10 @@ const SettingsPage = () => {
     if (typeof value === 'number') {
       if (key === 'focusDuration' && (isNaN(value) || value < 1)) {
         value = 1;
-      } else if (key === 'shortBreakDuration' && (isNaN(value) || value < 1)) {
-        value = 1;
-      } else if (key === 'longBreakDuration' && (isNaN(value) || value < 1)) {
-        value = 1;
+      } else if (key === 'shortBreakDuration' && (isNaN(value) || value < 0.5)) {
+        value = 0.5;
+      } else if (key === 'longBreakDuration' && (isNaN(value) || value < 0.5)) {
+        value = 0.5;
       } else if (key === 'roundsBeforeLongBreak' && (isNaN(value) || value < 1)) {
         value = 1;
       }
@@ -91,18 +91,19 @@ const SettingsPage = () => {
             </label>
             <input
               type="number"
-              min="1"
+              min="0.5"
               max="60"
+              step="0.5"
               value={localSettings.shortBreakDuration}
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === '') return;
-                handleChange('shortBreakDuration', parseInt(value) || 1);
+                handleChange('shortBreakDuration', parseFloat(value) || 0.5);
               }}
               onBlur={(e) => {
                 const value = e.target.value;
-                if (value === '' || parseInt(value) < 1) {
-                  handleChange('shortBreakDuration', 1);
+                if (value === '' || parseFloat(value) < 0.5) {
+                  handleChange('shortBreakDuration', 0.5);
                 }
               }}
               className="w-full px-3 py-2 bg-lighter-navy border border-gray-text/30 rounded-md text-off-white focus:outline-none focus:border-tomato"
@@ -116,18 +117,19 @@ const SettingsPage = () => {
             </label>
             <input
               type="number"
-              min="1"
+              min="0.5"
               max="60"
+              step="0.5"
               value={localSettings.longBreakDuration}
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === '') return;
-                handleChange('longBreakDuration', parseInt(value) || 1);
+                handleChange('longBreakDuration', parseFloat(value) || 0.5);
               }}
               onBlur={(e) => {
                 const value = e.target.value;
-                if (value === '' || parseInt(value) < 1) {
-                  handleChange('longBreakDuration', 1);
+                if (value === '' || parseFloat(value) < 0.5) {
+                  handleChange('longBreakDuration', 0.5);
                 }
               }}
               className="w-full px-3 py-2 bg-lighter-navy border border-gray-text/30 rounded-md text-off-white focus:outline-none focus:border-tomato"
