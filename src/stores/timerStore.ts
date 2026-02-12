@@ -3,8 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Settings } from './settingsStore';
 import { playNotificationSound } from '../utils/sound';
 import { sendPhaseNotification } from '../utils/notifications';
-import { saveHistory, clearAllData } from '../utils/storage';
-import { Phase, TimerStatus, HistoryEntry } from '../types';
+import { saveHistory, clearAllData, saveActiveNotes } from '../utils/storage';
+import { Phase, TimerStatus, HistoryEntry, LineObject } from '../types';
 import { debugLogger } from '../components/DebugPanel';
 
 interface TimerStore {
@@ -14,6 +14,8 @@ interface TimerStore {
   currentRound: number;
   totalRounds: number;
   history: HistoryEntry[];
+  activeNotes: string;
+  lines: LineObject[];
 
   startTimer: () => void;
   pauseTimer: () => void;
@@ -29,6 +31,18 @@ interface TimerStore {
   loadHistory: (history: HistoryEntry[]) => void;
   deleteHistoryEntry: (id: string) => Promise<void>;
   resetAllData: () => Promise<void>;
+  setActiveNotes: (notes: string) => Promise<void>;
+  loadActiveNotes: (notes: string) => void;
+  setLines: (lines: LineObject[]) => Promise<void>;
+  loadLines: (lines: LineObject[]) => void;
+  updateLine: (id: string, updates: Partial<LineObject>) => void;
+  addLine: (line: Omit<LineObject, 'id'>) => void;
+  deleteLine: (id: string) => void;
+  parseNotesToLines: (notes: string) => LineObject[];
+  linesToNotes: (lines: LineObject[]) => string;
+  restoreFromHistory: (line: string) => Promise<void>;
+  cleanupNotes: (settings: Settings) => void;
+  savePhaseSnapshot: (settings: Settings) => Promise<void>;
 }
 
 export const useTimerStore = create<TimerStore>((set, get) => ({
@@ -38,39 +52,35 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   currentRound: 1,
   totalRounds: 4,
   history: [],
+  activeNotes: '',
+  lines: [],
 
-  startTimer: () => set({ status: 'running' }),
+  startTimer: () => {
+    const state = get();
+    const wasIdle = state.status === 'idle';
+    // Timer started
+    set({ status: 'running' });
+  },
 
   pauseTimer: () => set({ status: 'paused' }),
 
   stopTimer: (settings: Settings) => {
     const state = get();
     if (state.status === 'running' || state.status === 'paused') {
-      const entry: HistoryEntry = {
-        id: uuidv4(),
-        timestamp: new Date().toISOString(),
-        phase: state.currentPhase,
-        durationMinutes: getDurationForPhase(state.currentPhase, settings),
-        status: 'stopped',
-      };
+      // Save snapshot at END of phase before stopping
+      get().savePhaseSnapshot(settings);
+      
       set({
         status: 'idle',
         timeLeft: getDurationForPhase(state.currentPhase, settings) * 60,
       });
-      get().addHistoryEntry(entry);
     }
   },
 
   skipPhase: (settings: Settings) => {
     const state = get();
-    const entry: HistoryEntry = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      phase: state.currentPhase,
-      durationMinutes: getDurationForPhase(state.currentPhase, settings),
-      status: 'skipped',
-    };
-    get().addHistoryEntry(entry);
+    // Save snapshot at END of phase before skipping
+    get().savePhaseSnapshot(settings);
     get().nextPhase(settings);
   },
 
@@ -78,19 +88,12 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   completePhase: (settings: Settings) => {
     const state = get();
-    const entry: HistoryEntry = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      phase: state.currentPhase,
-      durationMinutes: getDurationForPhase(state.currentPhase, settings),
-      status: 'completed',
-    };
-
     // Play sound and send notification
     playNotificationSound(settings.soundEnabled);
     sendPhaseNotification(state.currentPhase, settings.notificationsEnabled);
 
-    get().addHistoryEntry(entry);
+    // Save snapshot at END of phase before completing
+    get().savePhaseSnapshot(settings);
     get().nextPhase(settings);
   },
 
@@ -160,6 +163,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   loadHistory: (history) => set({ history }),
 
+  loadActiveNotes: (notes) => set({ activeNotes: notes }),
+
   deleteHistoryEntry: async (id) => {
     const currentHistory = get().history;
     const entryExists = currentHistory.some(e => e.id === id);
@@ -188,12 +193,281 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   },
 
   resetAllData: async () => {
-    set({ history: [], status: 'idle', currentPhase: 'focus', currentRound: 1 });
+    set({ history: [], status: 'idle', currentPhase: 'focus', currentRound: 1, activeNotes: '' });
     try {
       await clearAllData();
     } catch (error) {
       console.error('Failed to reset all data:', error);
     }
+  },
+
+  setActiveNotes: async (notes) => {
+    set({ activeNotes: notes });
+    try {
+      await saveActiveNotes(notes);
+    } catch (error) {
+      console.error('Failed to save active notes:', error);
+    }
+  },
+
+  restoreFromHistory: async (line) => {
+    const state = get();
+    const newNotes = line + (state.activeNotes ? '\n' + state.activeNotes : '');
+    await get().setActiveNotes(newNotes);
+  },
+
+  cleanupNotes: (settings) => {
+    const state = get();
+    if (!state.activeNotes || settings.keepCompletedAcrossPhases) {
+      console.log('🧹 Cleanup skipped:', settings.keepCompletedAcrossPhases ? 'keepCompletedAcrossPhases is ON' : 'no active notes');
+      return;
+    }
+
+    const lines = state.activeNotes.split('\n');
+    const cleanedLines: string[] = [];
+    let i = 0;
+    
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Keep notes (lines starting with #)
+      if (trimmedLine.startsWith('#')) {
+        cleanedLines.push(line);
+        i++;
+        continue;
+      }
+      
+      // Check if this is a top-level task line
+      const isIndented = line.startsWith('\t') || line.startsWith('  ');
+      if (!isIndented && trimmedLine) {
+        // This is a top-level task - check if it's completed
+        const isCompleted = trimmedLine.startsWith('✓');
+        
+        if (!isCompleted) {
+          // Keep incomplete task and its children
+          cleanedLines.push(line);
+          i++;
+          
+          // Add any following children
+          while (i < lines.length) {
+            const childLine = lines[i];
+            const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
+            if (isChildIndented) {
+              cleanedLines.push(childLine);
+              i++;
+            } else {
+              break;
+            }
+          }
+        } else {
+          // Skip completed task and its children
+          i++;
+          while (i < lines.length) {
+            const childLine = lines[i];
+            const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
+            if (isChildIndented) {
+              i++;
+            } else {
+              break;
+            }
+          }
+        }
+      } else {
+        // This is an orphaned child or empty line, keep it
+        cleanedLines.push(line);
+        i++;
+      }
+    }
+    
+    const cleanedNotes = cleanedLines.join('\n').trim();
+    const originalLineCount = state.activeNotes.split('\n').filter(l => l.trim()).length;
+    const cleanedLineCount = cleanedLines.length;
+    
+    console.log(`🧹 Cleanup complete: removed ${originalLineCount - cleanedLineCount} completed task groups`);
+    
+    set({ activeNotes: cleanedNotes });
+    
+    // Also update the lines array to sync with the cleaned notes
+    const newLines = get().parseNotesToLines(cleanedNotes);
+    set({ lines: newLines });
+    saveActiveNotes(cleanedNotes).catch(error => {
+      console.error('Failed to save cleaned notes:', error);
+    });
+  },
+
+  savePhaseSnapshot: async (settings: Settings) => {
+    const state = get();
+    const lines = state.activeNotes.split('\n').filter(l => l.trim());
+    const tasks = lines.filter(line => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('#') && !line.startsWith('\t') && !line.startsWith('  ');
+    });
+    const completedTasks = tasks.filter(line => line.trim().startsWith('✓'));
+    
+    const entry: HistoryEntry = {
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      phase: state.currentPhase,
+      durationMinutes: getDurationForPhase(state.currentPhase, settings),
+      status: state.status === 'running' ? 'completed' : (state.status === 'paused' ? 'stopped' : 'skipped'),
+      notesSnapshot: state.activeNotes,
+    };
+    
+    // Snapshot saved
+    
+    await get().addHistoryEntry(entry);
+  },
+
+  setLines: async (lines) => {
+    console.log('🔄 setLines called with:', lines.map(l => ({ 
+      id: l.id.substring(0, 8),
+      content: `"${l.content}"`, 
+      isEmpty: l.content === '',
+      isIndented: l.isIndented,
+      parentId: l.parentId ? 'HAS_PARENT' : 'NO_PARENT'
+    })));
+
+    // Only convert to notes for storage if all lines have content
+    const hasEmptyLines = lines.some(line => line.content.trim() === '');
+    
+    if (hasEmptyLines) {
+      // Direct update without string conversion to preserve empty editing lines
+      console.log('📝 Direct lines update (has empty content for editing)');
+      set({ lines });
+    } else {
+      // Normal flow with string conversion and relationship parsing
+      const notes = get().linesToNotes(lines);
+      const reparsedLines = get().parseNotesToLines(notes);
+      console.log('🔄 setLines with relationships:', reparsedLines.map(l => ({ 
+        content: l.content, 
+        isIndented: l.isIndented,
+        parentId: l.parentId ? 'HAS_PARENT' : 'NO_PARENT'
+      })));
+      
+      set({ activeNotes: notes, lines: reparsedLines });
+      try {
+        await saveActiveNotes(notes);
+      } catch (error) {
+        console.error('Failed to save lines as notes:', error);
+      }
+    }
+  },
+
+  loadLines: (lines) => set({ lines }),
+
+  updateLine: (id, updates) => {
+    const state = get();
+    console.log('🔄 updateLine called:', { 
+      id, 
+      updates, 
+      currentLine: state.lines.find(l => l.id === id) 
+    });
+    
+    const newLines = state.lines.map(line => {
+      if (line.id === id) {
+        const updatedLine = { ...line, ...updates };
+        console.log('✏️ Line updated:', { 
+          old: line, 
+          new: updatedLine 
+        });
+        return updatedLine;
+      }
+      
+      // If this is a child and its parent was updated, inherit completion state
+      if (line.parentId === id && updates.completed !== undefined) {
+        console.log('👶 Child inherited completion from parent');
+        return { ...line, completed: updates.completed };
+      }
+      
+      return line;
+    });
+    get().setLines(newLines);
+  },
+
+  addLine: (line) => {
+    const state = get();
+    const newLine: LineObject = { ...line, id: uuidv4() };
+    const newLines = [...state.lines, newLine];
+    get().setLines(newLines);
+  },
+
+  deleteLine: (id) => {
+    const state = get();
+    const newLines = state.lines.filter(line => line.id !== id);
+    get().setLines(newLines);
+  },
+
+  parseNotesToLines: (notes) => {
+    if (!notes) return [];
+    
+    const lines = notes.split('\n');
+    const result: LineObject[] = [];
+    let lastParentId: string | undefined = undefined;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip completely empty lines when parsing from storage
+      if (!trimmed && notes.includes('\n')) continue;
+      
+      const isIndented = line.startsWith('\t') || line.startsWith('  ');
+      
+      if (trimmed.startsWith('#')) {
+        const lineObj: LineObject = {
+          id: uuidv4(),
+          content: trimmed,
+          type: 'note' as const,
+          completed: false,
+          isIndented,
+          parentId: isIndented ? lastParentId : undefined
+        };
+        result.push(lineObj);
+        if (!isIndented) lastParentId = lineObj.id;
+      } else if (!isIndented) {
+        const isCompleted = trimmed.startsWith('✓');
+        const content = isCompleted ? trimmed.substring(2).trim() : trimmed;
+        const lineObj: LineObject = {
+          id: uuidv4(),
+          content,
+          type: 'task' as const,
+          completed: isCompleted,
+          isIndented: false
+        };
+        result.push(lineObj);
+        lastParentId = lineObj.id;
+      } else {
+        // Child line - treat as task that inherits parent completion
+        const lineObj: LineObject = {
+          id: uuidv4(),
+          content: trimmed,
+          type: 'task' as const,
+          completed: false, // Children inherit parent state but store their own
+          isIndented: true,
+          parentId: lastParentId
+        };
+        result.push(lineObj);
+        console.log('👶 Created child task:', { content: trimmed, parentId: lastParentId });
+      }
+    }
+    
+    return result;
+  },
+
+  linesToNotes: (lines) => {
+    return lines
+      .map(line => {
+        const indent = line.isIndented ? '  ' : '';
+        if (line.type === 'note') {
+          const content = line.content.startsWith('#') ? line.content : `# ${line.content}`;
+          return `${indent}${content}`;
+        } else {
+          const prefix = line.completed ? '✓ ' : '';
+          return `${indent}${prefix}${line.content}`;
+        }
+      })
+      .filter(line => line.trim() !== '') // Filter after mapping to preserve structure
+      .join('\n');
   },
 }));
 

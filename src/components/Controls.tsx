@@ -3,9 +3,20 @@ import { useTimerStore } from '../stores/timerStore';
 import { useSettingsStore } from '../stores/settingsStore';
 
 const Controls: React.FC = () => {
-  const { status, startTimer, pauseTimer, skipPhase } = useTimerStore();
+  const { status, currentPhase, startTimer, pauseTimer, skipPhase, cleanupNotes } = useTimerStore();
   const { settings } = useSettingsStore();
 
+  const handleStartClick = () => {
+    const wasIdle = status === 'idle';
+    
+    // Run cleanup BEFORE starting if this is a new Focus session
+    if (currentPhase === 'focus' && wasIdle) {
+      console.log('🧹 Starting new Focus session - running cleanup');
+      cleanupNotes(settings);
+    }
+    
+    startTimer();
+  };
 
   const handleSkipClick = () => {
     skipPhase(settings);
@@ -15,7 +26,7 @@ const Controls: React.FC = () => {
     <div className="flex items-center justify-center gap-4 mt-4">
       {status === 'idle' || status === 'paused' ? (
         <button
-          onClick={startTimer}
+          onClick={handleStartClick}
           className="w-14 h-14 bg-tomato hover:bg-tomato/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
           aria-label="Start timer"
         >

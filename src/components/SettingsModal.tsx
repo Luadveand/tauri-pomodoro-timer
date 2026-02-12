@@ -60,7 +60,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           soundEnabled: true,
           notificationsEnabled: true,
           alwaysOnTop: false,
-          debugPanelEnabled: false,
+          debugPanelEnabled: localSettings.debugPanelEnabled,
+          keepCompletedAcrossPhases: false,
         };
         setLocalSettings(defaultSettings);
       }
@@ -76,7 +77,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           soundEnabled: true,
           notificationsEnabled: true,
           alwaysOnTop: false,
-          debugPanelEnabled: false,
+          debugPanelEnabled: localSettings.debugPanelEnabled,
+          keepCompletedAcrossPhases: false,
         };
         setLocalSettings(defaultSettings);
       }
@@ -329,6 +331,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 >
                   Reset App Data
                 </button>
+
+                {/* Keep Completed Tasks Toggle */}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-tomato">
+                    Keep Completed Tasks Across Phases
+                  </label>
+                  <button
+                    onClick={() => handleChange('keepCompletedAcrossPhases', !localSettings.keepCompletedAcrossPhases)}
+                    className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.keepCompletedAcrossPhases ? 'bg-tomato' : 'bg-gray-text/30'
+                      }`}
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.keepCompletedAcrossPhases ? 'translate-x-6' : 'translate-x-0.5'
+                        }`}
+                    />
+                  </button>
+                </div>
 
                 {/* Debug Panel Toggle */}
                 <div className="flex items-center justify-between">

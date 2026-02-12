@@ -7,4 +7,14 @@ export interface HistoryEntry {
     phase: Phase;
     durationMinutes: number;
     status: 'completed' | 'skipped' | 'stopped';
+    notesSnapshot?: string;
+}
+
+export interface LineObject {
+    id: string;
+    content: string;
+    type: 'note' | 'task';
+    completed: boolean;
+    isIndented?: boolean;
+    parentId?: string;
 }

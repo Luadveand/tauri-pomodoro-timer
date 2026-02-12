@@ -1,22 +1,64 @@
-import { Store } from '@tauri-apps/plugin-store';
 import { Settings } from '../stores/settingsStore';
 import { HistoryEntry } from '../types';
 
-let store: Store | null = null;
+let store: any = null;
+let isInBrowser = false;
 
-const getStore = async (): Promise<Store> => {
-  if (!store) {
-    console.log('Loading Store instance...');
-    const storePath = 'settings.dat';
-    console.log('Using store path:', storePath);
+// Check if we're in browser mode (not Tauri)
+const isTauriApp = () => {
+  return typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
+};
+
+// Browser localStorage fallback
+class BrowserStore {
+  private prefix = 'pomodoro_';
+
+  async get<T>(key: string): Promise<T | null> {
     try {
-      // Use static load method as per API
-      store = await Store.load(storePath);
-      console.log('Store loaded successfully');
-    } catch (error) {
-      console.log('Store load failed (this is normal for first run):', error);
-      // If load fails, we might need to create it differently
-      throw error;
+      const item = localStorage.getItem(this.prefix + key);
+      return item ? JSON.parse(item) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, value: any): Promise<void> {
+    localStorage.setItem(this.prefix + key, JSON.stringify(value));
+  }
+
+  async save(): Promise<void> {
+    // No-op for localStorage
+  }
+
+  async clear(): Promise<void> {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(this.prefix));
+    keys.forEach(k => localStorage.removeItem(k));
+  }
+
+  async keys(): Promise<string[]> {
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith(this.prefix))
+      .map(k => k.replace(this.prefix, ''));
+  }
+}
+
+const getStore = async (): Promise<any> => {
+  if (!store) {
+    if (isTauriApp()) {
+      try {
+        const { Store } = await import('@tauri-apps/plugin-store');
+        const storePath = 'settings.dat';
+        store = await Store.load(storePath);
+        isInBrowser = false;
+      } catch (error) {
+        console.log('Tauri store failed, falling back to localStorage:', error);
+        store = new BrowserStore();
+        isInBrowser = true;
+      }
+    } else {
+      console.log('Running in browser mode, using localStorage');
+      store = new BrowserStore();
+      isInBrowser = true;
     }
   }
   return store;
@@ -25,6 +67,7 @@ const getStore = async (): Promise<Store> => {
 export interface AppData {
   settings: Settings;
   history: HistoryEntry[];
+  activeNotes: string;
 }
 
 const defaultData: AppData = {
@@ -36,38 +79,36 @@ const defaultData: AppData = {
     soundEnabled: true,
     notificationsEnabled: true,
     alwaysOnTop: false,
+    debugPanelEnabled: false,
+    keepCompletedAcrossPhases: false,
   },
   history: [],
+  activeNotes: '',
 };
 
 export const loadAppData = async (): Promise<AppData> => {
   try {
-    console.log('Loading app data from store...');
     const storeInstance = await getStore();
     const settings = await storeInstance.get<Settings>('settings');
     const history = await storeInstance.get<HistoryEntry[]>('history');
-
-    console.log('Loaded settings:', settings);
-    console.log('Loaded history length:', history?.length || 0);
+    const activeNotes = await storeInstance.get<string>('activeNotes');
 
     return {
       settings: settings || defaultData.settings,
       history: history || defaultData.history,
+      activeNotes: activeNotes || defaultData.activeNotes,
     };
   } catch (error) {
     console.error('Error loading app data:', error);
-    console.log('Using default data due to error');
     return defaultData;
   }
 };
 
 export const saveSettings = async (settings: Settings): Promise<void> => {
   try {
-    console.log('Saving settings:', settings);
     const storeInstance = await getStore();
     await storeInstance.set('settings', settings);
     await storeInstance.save();
-    console.log('Settings saved successfully');
   } catch (error) {
     console.error('Error saving settings:', error);
     throw error; // Re-throw to allow callers to handle the error
@@ -76,17 +117,23 @@ export const saveSettings = async (settings: Settings): Promise<void> => {
 
 export const saveHistory = async (history: HistoryEntry[]): Promise<void> => {
   try {
-    console.log('[Storage] saveHistory called with', history.length, 'entries');
-    console.log('[Storage] History IDs:', history.map(h => h.id));
     const storeInstance = await getStore();
-    console.log('[Storage] Got store instance, setting history...');
     await storeInstance.set('history', history);
-    console.log('[Storage] History set in store, saving...');
     await storeInstance.save();
-    console.log('[Storage] History saved successfully to persistent storage');
   } catch (error) {
     console.error('[Storage] Error saving history:', error);
     throw error; // Re-throw to allow callers to handle the error
+  }
+};
+
+export const saveActiveNotes = async (activeNotes: string): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.set('activeNotes', activeNotes);
+    await storeInstance.save();
+  } catch (error) {
+    console.error('[Storage] Error saving active notes:', error);
+    throw error;
   }
 };
 
@@ -105,7 +152,6 @@ export const clearAllData = async (): Promise<void> => {
     const storeInstance = await getStore();
     await storeInstance.clear();
     await storeInstance.save();
-    console.log('All data cleared successfully');
   } catch (error) {
     console.error('Error clearing all data:', error);
     throw error;
@@ -115,33 +161,24 @@ export const clearAllData = async (): Promise<void> => {
 
 // Debug function to test store functionality
 export const testStore = async (): Promise<void> => {
-  console.log('=== TESTING STORE FUNCTIONALITY ===');
   try {
-    // Test direct Store.load() first
-    console.log('Attempting to load store directly...');
-    const storeInstance = await Store.load('test-store.dat');
-    console.log('Store instance created successfully');
+    const storeInstance = await getStore();
 
     // Test setting a value
     await storeInstance.set('test', 'hello world');
-    console.log('Test value set');
 
     // Test saving
     await storeInstance.save();
-    console.log('Store saved successfully');
 
     // Test getting the value
     const value = await storeInstance.get('test');
-    console.log('Retrieved test value:', value);
 
     // Test getting all keys
     const keys = await storeInstance.keys();
-    console.log('All store keys:', keys);
 
-    console.log('=== STORE TEST COMPLETED SUCCESSFULLY ===');
+    console.log(`✅ Store test passed (${isInBrowser ? 'localStorage' : 'Tauri'})`, { value, keys });
   } catch (error) {
     console.error('=== STORE TEST FAILED ===', error);
-    console.log('This indicates the Store plugin may not be properly configured');
   }
 };
 

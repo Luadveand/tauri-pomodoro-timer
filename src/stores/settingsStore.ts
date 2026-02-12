@@ -10,6 +10,7 @@ export interface Settings {
   notificationsEnabled: boolean;
   alwaysOnTop: boolean;
   debugPanelEnabled: boolean;
+  keepCompletedAcrossPhases: boolean;
 }
 
 interface SettingsStore {
@@ -28,6 +29,7 @@ const defaultSettings: Settings = {
   notificationsEnabled: true,
   alwaysOnTop: false,
   debugPanelEnabled: false,
+  keepCompletedAcrossPhases: false,
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
