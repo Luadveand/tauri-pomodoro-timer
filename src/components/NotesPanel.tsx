@@ -51,7 +51,6 @@ const NotesPanel: React.FC = () => {
       completed: false
     };
     
-    console.log('📝 Creating new line for editing:', { newLineId, afterId });
     
     // Track this as a new line that should start editing
     setNewLineIds(prev => new Set(prev).add(newLineId));
@@ -60,14 +59,9 @@ const NotesPanel: React.FC = () => {
     const currentStore = useTimerStore.getState();
     const currentLines = currentStore.lines;
     
-    console.log('📝 Current lines before insertion:', currentLines.map(l => ({ 
-      id: l.id.substring(0, 8), 
-      content: `"${l.content}"` 
-    })));
     
     if (afterId) {
       const currentIndex = currentLines.findIndex(line => line.id === afterId);
-      console.log('📝 Found afterId at index:', currentIndex, 'of', currentLines.length);
       
       if (currentIndex === -1) {
         console.warn('⚠️ afterId not found, appending to end');
@@ -76,21 +70,15 @@ const NotesPanel: React.FC = () => {
       } else {
         const newLines = [...currentLines];
         newLines.splice(currentIndex + 1, 0, { ...newLine, id: newLineId });
-        console.log('📝 Adding line after index:', currentIndex, 'New array:', newLines.map(l => ({ 
-          id: l.id.substring(0, 8), 
-          content: `"${l.content}"` 
-        })));
         setLines(newLines);
       }
     } else {
       const newLines = [...currentLines, { ...newLine, id: newLineId }];
-      console.log('📝 Adding line to end. Current lines:', currentLines.length, 'New lines:', newLines.length);
       setLines(newLines);
     }
   };
 
   const handleAddFirstLine = () => {
-    console.log('🆕 Add first task clicked, lines.length:', lines.length);
     handleNewLine();
   };
 

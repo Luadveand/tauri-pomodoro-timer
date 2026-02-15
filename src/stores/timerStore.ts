@@ -219,7 +219,6 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   cleanupNotes: (settings) => {
     const state = get();
     if (!state.activeNotes || settings.keepCompletedAcrossPhases) {
-      console.log('🧹 Cleanup skipped:', settings.keepCompletedAcrossPhases ? 'keepCompletedAcrossPhases is ON' : 'no active notes');
       return;
     }
 
@@ -284,7 +283,6 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     const originalLineCount = state.activeNotes.split('\n').filter(l => l.trim()).length;
     const cleanedLineCount = cleanedLines.length;
     
-    console.log(`🧹 Cleanup complete: removed ${originalLineCount - cleanedLineCount} completed task groups`);
     
     set({ activeNotes: cleanedNotes });
     
@@ -320,30 +318,17 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   },
 
   setLines: async (lines) => {
-    console.log('🔄 setLines called with:', lines.map(l => ({ 
-      id: l.id.substring(0, 8),
-      content: `"${l.content}"`, 
-      isEmpty: l.content === '',
-      isIndented: l.isIndented,
-      parentId: l.parentId ? 'HAS_PARENT' : 'NO_PARENT'
-    })));
 
     // Only convert to notes for storage if all lines have content
     const hasEmptyLines = lines.some(line => line.content.trim() === '');
     
     if (hasEmptyLines) {
       // Direct update without string conversion to preserve empty editing lines
-      console.log('📝 Direct lines update (has empty content for editing)');
       set({ lines });
     } else {
       // Normal flow with string conversion and relationship parsing
       const notes = get().linesToNotes(lines);
       const reparsedLines = get().parseNotesToLines(notes);
-      console.log('🔄 setLines with relationships:', reparsedLines.map(l => ({ 
-        content: l.content, 
-        isIndented: l.isIndented,
-        parentId: l.parentId ? 'HAS_PARENT' : 'NO_PARENT'
-      })));
       
       set({ activeNotes: notes, lines: reparsedLines });
       try {
@@ -358,25 +343,15 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   updateLine: (id, updates) => {
     const state = get();
-    console.log('🔄 updateLine called:', { 
-      id, 
-      updates, 
-      currentLine: state.lines.find(l => l.id === id) 
-    });
     
     const newLines = state.lines.map(line => {
       if (line.id === id) {
         const updatedLine = { ...line, ...updates };
-        console.log('✏️ Line updated:', { 
-          old: line, 
-          new: updatedLine 
-        });
         return updatedLine;
       }
       
-      // If this is a child and its parent was updated, inherit completion state
+      // If this is a child and its parent was updated, sync completion state
       if (line.parentId === id && updates.completed !== undefined) {
-        console.log('👶 Child inherited completion from parent');
         return { ...line, completed: updates.completed };
       }
       
@@ -438,16 +413,18 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
         lastParentId = lineObj.id;
       } else {
         // Child line - treat as task that inherits parent completion
+        // Strip ✓ prefix from child content if present (children inherit completion from parent, not from their own content)
+        const hasCheckmark = trimmed.startsWith('✓');
+        const content = hasCheckmark ? trimmed.substring(2).trim() : trimmed;
         const lineObj: LineObject = {
           id: uuidv4(),
-          content: trimmed,
+          content,
           type: 'task' as const,
           completed: false, // Children inherit parent state but store their own
           isIndented: true,
           parentId: lastParentId
         };
         result.push(lineObj);
-        console.log('👶 Created child task:', { content: trimmed, parentId: lastParentId });
       }
     }
     
@@ -462,7 +439,13 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
           const content = line.content.startsWith('#') ? line.content : `# ${line.content}`;
           return `${indent}${content}`;
         } else {
-          const prefix = line.completed ? '✓ ' : '';
+          // For child tasks, use parent's completion state; for parent tasks, use their own
+          let isCompleted = line.completed;
+          if (line.isIndented && line.parentId) {
+            const parent = lines.find(l => l.id === line.parentId);
+            isCompleted = parent ? parent.completed : false;
+          }
+          const prefix = isCompleted ? '✓ ' : '';
           return `${indent}${prefix}${line.content}`;
         }
       })

@@ -11,7 +11,6 @@ const Controls: React.FC = () => {
     
     // Run cleanup BEFORE starting if this is a new Focus session
     if (currentPhase === 'focus' && wasIdle) {
-      console.log('🧹 Starting new Focus session - running cleanup');
       cleanupNotes(settings);
     }
     

@@ -51,12 +51,10 @@ const getStore = async (): Promise<any> => {
         store = await Store.load(storePath);
         isInBrowser = false;
       } catch (error) {
-        console.log('Tauri store failed, falling back to localStorage:', error);
         store = new BrowserStore();
         isInBrowser = true;
       }
     } else {
-      console.log('Running in browser mode, using localStorage');
       store = new BrowserStore();
       isInBrowser = true;
     }
@@ -176,7 +174,6 @@ export const testStore = async (): Promise<void> => {
     // Test getting all keys
     const keys = await storeInstance.keys();
 
-    console.log(`✅ Store test passed (${isInBrowser ? 'localStorage' : 'Tauri'})`, { value, keys });
   } catch (error) {
     console.error('=== STORE TEST FAILED ===', error);
   }

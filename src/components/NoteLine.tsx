@@ -24,13 +24,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
   const [editContent, setEditContent] = useState(line.content);
   const inputRef = useRef<HTMLInputElement>(null);
   
-  console.log('🎯 NoteLine render:', { 
-    lineId: line.id.substring(0, 8), 
-    content: line.content, 
-    startEditing, 
-    isEditing: isEditing,
-    shouldEdit: startEditing || line.content === ''
-  });
 
 
 
@@ -83,12 +76,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
       onNewLine(line.id);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      console.log('🔑 Tab pressed:', {
-        currentContent: editContent,
-        shiftKey: e.shiftKey,
-        currentLineType: line.type,
-        currentLineIndented: line.isIndented
-      });
       
       // Add/remove indentation to create child/parent lines
       let newContent = editContent;
@@ -96,19 +83,16 @@ const NoteLine: React.FC<NoteLineProps> = ({
         // Shift+Tab to reduce indentation
         if (editContent.startsWith('  ')) {
           newContent = editContent.substring(2);
-          console.log('📤 Reducing indentation:', { from: editContent, to: newContent });
         }
       } else {
         // Tab to add indentation
         newContent = '  ' + editContent;
-        console.log('📥 Adding indentation:', { from: editContent, to: newContent });
       }
       setEditContent(newContent);
       
       // Save the change immediately to update the line structure
       const trimmed = newContent.trim();
       if (trimmed) {
-        console.log('💾 Saving indented content:', { content: newContent, trimmed });
         onUpdate(line.id, { content: newContent }); // Save with indentation
       }
     } else if (e.key === 'Escape') {
