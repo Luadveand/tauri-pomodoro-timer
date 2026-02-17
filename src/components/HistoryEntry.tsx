@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HistoryEntry as HistoryEntryType } from '../types';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useTimerStore } from '../stores/timerStore';
+import HistoryDetailModal from './HistoryDetailModal';
 
 interface HistoryEntryProps {
   entry: HistoryEntryType;
@@ -10,6 +11,7 @@ interface HistoryEntryProps {
 
 const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
   const { restoreFromHistory } = useTimerStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const formatTime = (timestamp: string): string => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('en-US', {
@@ -84,21 +86,40 @@ const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
     
     return (
       <div className="mt-1 space-y-0.5">
-        {lines.map((line, index) => (
-          <div
-            key={index}
-            className="text-xs text-gray-text/70 font-mono cursor-pointer hover:text-off-white transition-colors truncate"
-            onClick={(e) => {
-              e.stopPropagation();
-              restoreFromHistory(line);
-            }}
-            title={`Click to restore: ${line}`}
-          >
-            {line}
-          </div>
-        ))}
+        {lines.map((line, index) => {
+          const isCompleted = line.trim().startsWith('✓');
+          const isChild = line.startsWith('  ') || line.startsWith('\t');
+          
+          return (
+            <div
+              key={index}
+              className={`text-xs font-mono cursor-pointer transition-colors truncate flex items-center gap-1 ${
+                isCompleted 
+                  ? 'text-soft-green/80 hover:text-soft-green' 
+                  : 'text-gray-text/70 hover:text-off-white'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                restoreFromHistory(line);
+              }}
+              title={`Click to restore: ${line}`}
+            >
+              {isChild && <span className="text-gray-text/40 text-xs">└─</span>}
+              <span className={isCompleted ? 'line-through opacity-80' : ''}>
+                {line}
+              </span>
+            </div>
+          );
+        })}
         {entry.notesSnapshot.split('\n').filter(line => line.trim()).length > 2 && (
-          <div className="text-xs text-gray-text/50 italic">+ more...</div>
+          <div className="text-xs text-gray-text/50 italic cursor-pointer hover:text-off-white"
+               onClick={(e) => {
+                 e.stopPropagation();
+                 setIsModalOpen(true);
+               }}
+          >
+            + more...
+          </div>
         )}
       </div>
     );
@@ -108,53 +129,75 @@ const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
 
 
   return (
-    <div className="px-4 py-3 border-b border-gray-text/20 hover:bg-deep-navy/50 transition-colors duration-200 relative group">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-sm text-gray-text">
-            <span>{formatTime(entry.timestamp)}</span>
-            <span className={`${getStatusColor(entry.status)}`}>
-              {getStatusIcon(entry.status)}
-            </span>
-            <span className="text-off-white">
-              {getPhaseText(entry.phase, entry.durationMinutes)}
-            </span>
-            {total > 0 && (
-              <span className="text-gray-text/80">
-                • {completed}/{total} tasks
+    <>
+      <div 
+        className="px-4 py-3 border-b border-gray-text/20 hover:bg-deep-navy/50 transition-colors duration-200 relative group cursor-pointer"
+        onClick={() => setIsModalOpen(true)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 text-sm text-gray-text">
+              <span>{formatTime(entry.timestamp)}</span>
+              <span className={`${getStatusColor(entry.status)}`}>
+                {getStatusIcon(entry.status)}
               </span>
-            )}
+              <span className="text-off-white">
+                {getPhaseText(entry.phase, entry.durationMinutes)}
+              </span>
+              {total > 0 && (
+                <span className="text-gray-text/80">
+                  • {completed}/{total} tasks
+                </span>
+              )}
+            </div>
+            {renderNotesSnapshot()}
           </div>
-          {renderNotesSnapshot()}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsModalOpen(true);
+              }}
+              className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-off-white mr-2"
+              title="View details"
+            >
+              👁
+            </button>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                
+                try {
+                  const confirmed = await ask('Are you sure you want to delete this entry?', {
+                    title: 'Confirm Delete',
+                    kind: 'warning'
+                  });
+                  
+                  if (confirmed) {
+                    onDelete(entry.id);
+                  }
+                } catch (error) {
+                  // Fallback to browser confirm if Tauri dialog fails
+                  const confirmed = window.confirm('Are you sure you want to delete this entry?');
+                  if (confirmed) {
+                    onDelete(entry.id);
+                  }
+                }
+              }}
+              className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-tomato flex-shrink-0"
+              title="Delete entry"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
-        <button
-          onClick={async (e) => {
-            e.stopPropagation();
-            
-            try {
-              const confirmed = await ask('Are you sure you want to delete this entry?', {
-                title: 'Confirm Delete',
-                kind: 'warning'
-              });
-              
-              if (confirmed) {
-                onDelete(entry.id);
-              }
-            } catch (error) {
-              // Fallback to browser confirm if Tauri dialog fails
-              const confirmed = window.confirm('Are you sure you want to delete this entry?');
-              if (confirmed) {
-                onDelete(entry.id);
-              }
-            }
-          }}
-          className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-tomato ml-2 flex-shrink-0"
-          title="Delete entry"
-        >
-          🗑️
-        </button>
       </div>
-    </div>
+      <HistoryDetailModal
+        entry={entry}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
   );
 };
 
