@@ -40,8 +40,8 @@ const NoteLine: React.FC<NoteLineProps> = ({
   }, [line.content, isEditing]);
 
   const handleToggleComplete = () => {
-    if (line.type === 'task' && !line.isIndented) {
-      // Only top-level tasks can be toggled
+    if (line.type === 'task') {
+      // Both parent and child tasks can be toggled
       onUpdate(line.id, { completed: !line.completed });
     }
   };
@@ -119,9 +119,8 @@ const NoteLine: React.FC<NoteLineProps> = ({
   };
 
   const getCompletionState = () => {
-    if (line.isIndented && parentLine) {
-      return parentLine.completed; // Child inherits parent state
-    }
+    // Each task shows its own completion state - no inheritance
+    // The cascading logic is handled in the store, not the UI
     return line.completed;
   };
 
@@ -144,22 +143,18 @@ const NoteLine: React.FC<NoteLineProps> = ({
   }
 
   const isCompleted = getCompletionState();
-  const canToggle = line.type === 'task' && !line.isIndented;
 
   return (
     <div className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}>
       {line.type === 'task' && (
         <button
           onClick={handleToggleComplete}
-          disabled={line.isIndented}
           className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center flex-shrink-0 transition-all ${
             isCompleted
               ? 'border-soft-green bg-soft-green text-deep-navy'
-              : line.isIndented
-                ? 'border-gray-text/20 bg-deep-navy/50 cursor-not-allowed'
-                : 'border-gray-text/40 bg-deep-navy hover:border-soft-green hover:bg-soft-green/10'
+              : 'border-gray-text/40 bg-deep-navy hover:border-soft-green hover:bg-soft-green/10'
           }`}
-          title={line.isIndented ? 'Child tasks inherit parent completion' : (isCompleted ? 'Mark as incomplete' : 'Mark as completed')}
+          title={isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
         >
           {isCompleted && <span className="text-xs leading-none font-bold">✓</span>}
         </button>

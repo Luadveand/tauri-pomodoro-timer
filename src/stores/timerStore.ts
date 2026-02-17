@@ -36,6 +36,8 @@ interface TimerStore {
   setLines: (lines: LineObject[]) => Promise<void>;
   loadLines: (lines: LineObject[]) => void;
   updateLine: (id: string, updates: Partial<LineObject>) => void;
+  checkParentAutoCompletion: (lines: LineObject[], parentId: string) => LineObject[];
+  cascadeParentIncompletion: (lines: LineObject[], parentId: string) => LineObject[];
   addLine: (line: Omit<LineObject, 'id'>) => void;
   deleteLine: (id: string) => void;
   parseNotesToLines: (notes: string) => LineObject[];
@@ -341,22 +343,82 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   loadLines: (lines) => set({ lines }),
 
+  checkParentAutoCompletion: (lines, parentId) => {
+    const parent = lines.find(line => line.id === parentId);
+    if (!parent || parent.type !== 'task') {
+      return lines;
+    }
+
+    const children = lines.filter(line => line.parentId === parentId && line.type === 'task');
+    if (children.length === 0) {
+      return lines;
+    }
+
+    const allChildrenCompleted = children.every(child => child.completed);
+    
+    if (allChildrenCompleted && !parent.completed) {
+      const updatedLines = lines.map(line => 
+        line.id === parentId ? { ...line, completed: true } : line
+      );
+      
+      // Recursively check grandparent if this parent has a parent
+      if (parent.parentId) {
+        return get().checkParentAutoCompletion(updatedLines, parent.parentId);
+      }
+      
+      return updatedLines;
+    }
+
+    return lines;
+  },
+
+  cascadeParentIncompletion: (lines, parentId) => {
+    let updatedLines = lines.map(line => 
+      line.id === parentId ? { ...line, completed: false } : line
+    );
+    
+    const parent = updatedLines.find(line => line.id === parentId);
+    if (parent && parent.parentId) {
+      updatedLines = get().cascadeParentIncompletion(updatedLines, parent.parentId);
+    }
+    
+    return updatedLines;
+  },
+
   updateLine: (id, updates) => {
     const state = get();
     
-    const newLines = state.lines.map(line => {
-      if (line.id === id) {
-        const updatedLine = { ...line, ...updates };
-        return updatedLine;
-      }
+    // Step 1: Apply the direct update
+    let newLines = state.lines.map(line => 
+      line.id === id ? { ...line, ...updates } : line
+    );
+
+    // Step 2: Handle completion state cascading
+    if (updates.completed !== undefined) {
+      const updatedTask = newLines.find(line => line.id === id);
       
-      // If this is a child and its parent was updated, sync completion state
-      if (line.parentId === id && updates.completed !== undefined) {
-        return { ...line, completed: updates.completed };
+      if (updatedTask && updatedTask.type === 'task') {
+        // First: If this task has children, cascade the change to them
+        const hasChildren = newLines.some(line => line.parentId === id);
+        if (hasChildren) {
+          newLines = newLines.map(line =>
+            line.parentId === id ? { ...line, completed: updates.completed! } : line
+          );
+        }
+
+        // Second: If this task has a parent, handle parent auto-completion/incompletion
+        if (updatedTask.parentId) {
+          if (updates.completed) {
+            // Child completed - check if parent should auto-complete
+            newLines = get().checkParentAutoCompletion(newLines, updatedTask.parentId);
+          } else {
+            // Child unchecked - cascade incompletion up the tree
+            newLines = get().cascadeParentIncompletion(newLines, updatedTask.parentId);
+          }
+        }
       }
-      
-      return line;
-    });
+    }
+
     get().setLines(newLines);
   },
 
@@ -412,15 +474,14 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
         result.push(lineObj);
         lastParentId = lineObj.id;
       } else {
-        // Child line - treat as task that inherits parent completion
-        // Strip ✓ prefix from child content if present (children inherit completion from parent, not from their own content)
+        // Child line - can have its own completion state
         const hasCheckmark = trimmed.startsWith('✓');
         const content = hasCheckmark ? trimmed.substring(2).trim() : trimmed;
         const lineObj: LineObject = {
           id: uuidv4(),
           content,
           type: 'task' as const,
-          completed: false, // Children inherit parent state but store their own
+          completed: hasCheckmark, // Child tasks can have their own completion state
           isIndented: true,
           parentId: lastParentId
         };
@@ -439,13 +500,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
           const content = line.content.startsWith('#') ? line.content : `# ${line.content}`;
           return `${indent}${content}`;
         } else {
-          // For child tasks, use parent's completion state; for parent tasks, use their own
-          let isCompleted = line.completed;
-          if (line.isIndented && line.parentId) {
-            const parent = lines.find(l => l.id === line.parentId);
-            isCompleted = parent ? parent.completed : false;
-          }
-          const prefix = isCompleted ? '✓ ' : '';
+          // Each task (parent or child) uses its own completion state
+          const prefix = line.completed ? '✓ ' : '';
           return `${indent}${prefix}${line.content}`;
         }
       })
