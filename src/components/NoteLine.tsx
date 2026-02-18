@@ -7,6 +7,8 @@ interface NoteLineProps {
   onUpdate: (id: string, updates: Partial<LineObject>) => void;
   onDelete: (id: string) => void;
   onNewLine: (afterId: string) => void;
+  onNewChildLine: (parentId: string) => void;
+  onConvertToParent: (id: string) => void;
   isLast: boolean;
   startEditing?: boolean;
 }
@@ -17,6 +19,8 @@ const NoteLine: React.FC<NoteLineProps> = ({
   onUpdate, 
   onDelete, 
   onNewLine, 
+  onNewChildLine,
+  onConvertToParent,
   isLast,
   startEditing = false
 }) => {
@@ -77,30 +81,44 @@ const NoteLine: React.FC<NoteLineProps> = ({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       
-      // Add/remove indentation to create child/parent lines
-      let newContent = editContent;
       if (e.shiftKey) {
-        // Shift+Tab to reduce indentation
+        // Shift+Tab to reduce indentation (existing behavior)
         if (editContent.startsWith('  ')) {
-          newContent = editContent.substring(2);
+          const newContent = editContent.substring(2);
+          setEditContent(newContent);
+          const trimmed = newContent.trim();
+          if (trimmed) {
+            onUpdate(line.id, { content: newContent });
+          }
         }
       } else {
-        // Tab to add indentation
-        newContent = '  ' + editContent;
-      }
-      setEditContent(newContent);
-      
-      // Save the change immediately to update the line structure
-      const trimmed = newContent.trim();
-      if (trimmed) {
-        onUpdate(line.id, { content: newContent }); // Save with indentation
+        // Enhanced Tab behavior: indent current line + create child line
+        const trimmed = editContent.trim();
+        if (trimmed) {
+          // Save current line as child (indented)
+          const indentedContent = '  ' + editContent;
+          onUpdate(line.id, { content: indentedContent });
+          setIsEditing(false);
+          
+          // Create new child line after this one
+          onNewChildLine(line.id);
+        }
       }
     } else if (e.key === 'Escape') {
       setIsEditing(false);
       setEditContent(line.content);
-    } else if (e.key === 'Backspace' && editContent === '') {
-      e.preventDefault();
-      onDelete(line.id);
+    } else if (e.key === 'Backspace') {
+      // Smart backspace behavior
+      if (editContent === '' && line.isIndented) {
+        // Convert child to parent when backspacing on empty indented line
+        e.preventDefault();
+        onConvertToParent(line.id);
+      } else if (editContent === '' && !line.isIndented) {
+        // Delete empty parent line (existing behavior)
+        e.preventDefault();
+        onDelete(line.id);
+      }
+      // If line has content, allow normal backspace behavior
     } else if (e.key === ' ' && e.ctrlKey) {
       e.preventDefault();
       handleToggleComplete();

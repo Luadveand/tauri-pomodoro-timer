@@ -82,6 +82,60 @@ const NotesPanel: React.FC = () => {
     handleNewLine();
   };
 
+  const handleNewChildLine = (parentId: string) => {
+    const newLineId = uuidv4();
+    const newLine = {
+      content: '', // Start with empty content for immediate editing
+      type: 'task' as const,
+      completed: false,
+      isIndented: true // Child lines are indented
+    };
+    
+    // Track this as a new line that should start editing
+    setNewLineIds(prev => new Set(prev).add(newLineId));
+    
+    // Get current state and find parent line
+    const currentStore = useTimerStore.getState();
+    const currentLines = currentStore.lines;
+    const parentIndex = currentLines.findIndex(line => line.id === parentId);
+    
+    if (parentIndex === -1) {
+      console.warn('⚠️ parentId not found, appending to end');
+      const newLines = [...currentLines, { ...newLine, id: newLineId }];
+      setLines(newLines);
+    } else {
+      // Insert new child line after the parent
+      const newLines = [...currentLines];
+      newLines.splice(parentIndex + 1, 0, { ...newLine, id: newLineId });
+      setLines(newLines);
+    }
+  };
+
+  const handleConvertToParent = (lineId: string) => {
+    const currentStore = useTimerStore.getState();
+    const currentLines = currentStore.lines;
+    const lineIndex = currentLines.findIndex(line => line.id === lineId);
+    
+    if (lineIndex === -1) {
+      console.warn('⚠️ lineId not found for conversion');
+      return;
+    }
+    
+    const line = currentLines[lineIndex];
+    
+    // Convert child to parent by removing indentation and parentId
+    const updatedLine = {
+      ...line,
+      isIndented: false,
+      parentId: undefined,
+      content: line.content.startsWith('  ') ? line.content.substring(2) : line.content
+    };
+    
+    const newLines = [...currentLines];
+    newLines[lineIndex] = updatedLine;
+    setLines(newLines);
+  };
+
   const parseTaskCount = (currentLines: typeof lines): { completed: number; total: number } => {
     // Only count parent tasks (top-level tasks), not children - consistent with history entries
     const parentTasks = currentLines.filter(line => line.type === 'task' && !line.parentId);
@@ -130,6 +184,8 @@ const NotesPanel: React.FC = () => {
                   onUpdate={handleLineUpdate}
                   onDelete={handleLineDelete}
                   onNewLine={handleNewLine}
+                  onNewChildLine={handleNewChildLine}
+                  onConvertToParent={handleConvertToParent}
                   isLast={index === lines.length - 1}
                   startEditing={newLineIds.has(line.id)}
                 />
