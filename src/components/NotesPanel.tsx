@@ -83,9 +83,10 @@ const NotesPanel: React.FC = () => {
   };
 
   const parseTaskCount = (currentLines: typeof lines): { completed: number; total: number } => {
-    const tasks = currentLines.filter(line => line.type === 'task');
-    const completed = tasks.filter(task => task.completed).length;
-    return { completed, total: tasks.length };
+    // Only count parent tasks (top-level tasks), not children - consistent with history entries
+    const parentTasks = currentLines.filter(line => line.type === 'task' && !line.parentId);
+    const completed = parentTasks.filter(task => task.completed).length;
+    return { completed, total: parentTasks.length };
   };
 
   const { completed, total } = parseTaskCount(lines);
