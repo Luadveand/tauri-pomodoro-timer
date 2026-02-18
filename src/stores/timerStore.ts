@@ -42,7 +42,10 @@ interface TimerStore {
   deleteLine: (id: string) => void;
   parseNotesToLines: (notes: string) => LineObject[];
   linesToNotes: (lines: LineObject[]) => string;
-  restoreFromHistory: (line: string) => Promise<void>;
+  restoreFromHistory: (line: string, notesSnapshot?: string) => Promise<void>;
+  parseLineContext: (targetLine: string, notesSnapshot: string) => { isChild: boolean; parentIndex: number; targetIndex: number };
+  extractTaskHierarchy: (targetLine: string, notesSnapshot: string) => string[];
+  mergeWithCurrentNotes: (tasksToRestore: string[], currentNotes: string) => string;
   cleanupNotes: (settings: Settings) => void;
   savePhaseSnapshot: (settings: Settings) => Promise<void>;
 }
@@ -212,10 +215,141 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     }
   },
 
-  restoreFromHistory: async (line) => {
+  // Helper function to parse line context from history snapshot
+  parseLineContext: (targetLine: string, notesSnapshot: string) => {
+    const lines = notesSnapshot.split('\n');
+    let targetIndex = -1;
+    
+    // Find the exact line in the snapshot
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === targetLine) {
+        targetIndex = i;
+        break;
+      }
+    }
+    
+    if (targetIndex === -1) {
+      return { isChild: false, parentIndex: -1, targetIndex: -1 };
+    }
+    
+    const line = lines[targetIndex];
+    const isChild = line.startsWith('  ') || line.startsWith('\t');
+    
+    // If it's a child, find its parent
+    let parentIndex = -1;
+    if (isChild) {
+      // Look backwards for the parent (first non-indented line)
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        const prevLine = lines[i];
+        if (prevLine.trim() && !prevLine.startsWith('  ') && !prevLine.startsWith('\t')) {
+          parentIndex = i;
+          break;
+        }
+      }
+    }
+    
+    return { isChild, parentIndex, targetIndex };
+  },
+
+  // Helper function to extract task hierarchy based on recovery rules
+  extractTaskHierarchy: (targetLine: string, notesSnapshot: string) => {
+    const lines = notesSnapshot.split('\n');
+    const { isChild, parentIndex, targetIndex } = get().parseLineContext(targetLine, notesSnapshot);
+    
+    if (targetIndex === -1) {
+      return [targetLine]; // Fallback to just the line itself
+    }
+    
+    const tasksToRestore: string[] = [];
+    
+    if (isChild) {
+      // Rule: Child recovery restores parent + child (not siblings)
+      if (parentIndex >= 0) {
+        tasksToRestore.push(lines[parentIndex]); // Add parent
+      }
+      tasksToRestore.push(lines[targetIndex]); // Add the child itself
+    } else {
+      // Rule: Parent recovery restores parent + all children
+      tasksToRestore.push(lines[targetIndex]); // Add the parent
+      
+      // Find all children (consecutive indented lines after parent)
+      for (let i = targetIndex + 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('  ') || line.startsWith('\t')) {
+          tasksToRestore.push(line); // Add child
+        } else if (line.trim()) {
+          // Hit another parent or non-indented line, stop
+          break;
+        }
+      }
+    }
+    
+    return tasksToRestore;
+  },
+
+  // Helper function to merge tasks with current notes, avoiding duplicates
+  mergeWithCurrentNotes: (tasksToRestore: string[], currentNotes: string) => {
+    const currentLines = currentNotes.split('\n');
+    
+    // Create a more precise duplicate detection that considers both content and indentation
+    const existingTasks = new Set();
+    for (const line of currentLines) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        // Store the exact task content with indentation info for precise matching
+        const isIndented = line.startsWith('  ') || line.startsWith('\t');
+        const taskContent = trimmed.replace(/^✓\s*/, ''); // Remove completion marker
+        const key = `${isIndented ? 'child' : 'parent'}:${taskContent}`;
+        existingTasks.add(key);
+      }
+    }
+    
+    // Filter out tasks that already exist exactly (same content AND same level)
+    const newTasks = tasksToRestore.filter(task => {
+      const trimmed = task.trim();
+      if (!trimmed) return false;
+      
+      const isIndented = task.startsWith('  ') || task.startsWith('\t');
+      const taskContent = trimmed.replace(/^✓\s*/, ''); // Remove completion marker
+      const key = `${isIndented ? 'child' : 'parent'}:${taskContent}`;
+      
+      return !existingTasks.has(key);
+    });
+    
+    // Add new tasks at the END, maintaining proper structure
+    if (newTasks.length > 0) {
+      if (currentNotes.trim()) {
+        return currentNotes + '\n' + newTasks.join('\n');
+      } else {
+        return newTasks.join('\n');
+      }
+    }
+    
+    return currentNotes;
+  },
+
+  restoreFromHistory: async (line, notesSnapshot) => {
     const state = get();
-    const newNotes = line + (state.activeNotes ? '\n' + state.activeNotes : '');
-    await get().setActiveNotes(newNotes);
+    
+    // If no snapshot provided, fallback to simple restore
+    if (!notesSnapshot) {
+      const newNotes = line + (state.activeNotes ? '\n' + state.activeNotes : '');
+      await get().setActiveNotes(newNotes);
+      return;
+    }
+    
+    // Extract the proper task hierarchy based on recovery rules
+    const tasksToRestore = get().extractTaskHierarchy(line, notesSnapshot);
+    
+    // Merge with current notes intelligently
+    const mergedNotes = get().mergeWithCurrentNotes(tasksToRestore, state.activeNotes);
+    
+    // Update both string representation and lines array
+    await get().setActiveNotes(mergedNotes);
+    
+    // Also parse and update the lines array to maintain consistency
+    const newLines = get().parseNotesToLines(mergedNotes);
+    set({ lines: newLines });
   },
 
   cleanupNotes: (settings) => {

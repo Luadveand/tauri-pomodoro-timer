@@ -86,7 +86,7 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
                     : 'text-off-white'
               }`}
               onClick={() => {
-                restoreFromHistory(line);
+                restoreFromHistory(line, entry.notesSnapshot);
                 onClose();
               }}
               title={`Click to restore: ${line}`}
