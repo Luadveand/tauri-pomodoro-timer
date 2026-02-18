@@ -127,15 +127,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
 
   return (
-    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-accent-surface rounded-lg shadow-xl w-80 max-w-[95vw] max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div 
+        className="bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-text/20">
-          <h2 className="text-lg font-semibold text-off-white">Settings</h2>
+        <div className="px-6 py-4 border-b border-gray-text/20">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-medium text-off-white">Settings</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-text hover:text-off-white transition-colors text-2xl"
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="px-4 py-3 space-y-4">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto">
           {/* Focus Duration */}
           <div>
             <label className="block text-sm font-medium text-off-white mb-1">
@@ -371,7 +383,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-text/20 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-text/20 bg-accent-surface/30 flex justify-end gap-3">
           <button
             onClick={handleCancel}
             className="px-4 py-2 text-gray-text hover:text-off-white transition-colors duration-200"
