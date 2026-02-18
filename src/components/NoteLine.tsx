@@ -9,8 +9,11 @@ interface NoteLineProps {
   onNewLine: (afterId: string) => void;
   onNewChildLine: (parentId: string) => void;
   onConvertToParent: (id: string) => void;
+  onStartEdit: (id: string) => void;
+  onEndEdit: () => void;
   isLast: boolean;
   startEditing?: boolean;
+  isEditing: boolean;
 }
 
 const NoteLine: React.FC<NoteLineProps> = ({ 
@@ -21,10 +24,12 @@ const NoteLine: React.FC<NoteLineProps> = ({
   onNewLine, 
   onNewChildLine,
   onConvertToParent,
+  onStartEdit,
+  onEndEdit,
   isLast,
-  startEditing = false
+  startEditing = false,
+  isEditing
 }) => {
-  const [isEditing, setIsEditing] = useState(startEditing || line.content === '');
   const [editContent, setEditContent] = useState(line.content);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -36,6 +41,28 @@ const NoteLine: React.FC<NoteLineProps> = ({
       inputRef.current.focus();
     }
   }, [isEditing]);
+
+  // Listen for outside click save events
+  useEffect(() => {
+    const handleOutsideClickSave = (event: CustomEvent) => {
+      if (isEditing && event.detail.lineId === line.id) {
+        // Save current content when outside click occurs
+        const trimmed = editContent.trim();
+        if (trimmed) {
+          onUpdate(line.id, { content: trimmed });
+        } else {
+          onDelete(line.id);
+        }
+      }
+    };
+
+    if (isEditing) {
+      document.addEventListener('outsideClickSave', handleOutsideClickSave as EventListener);
+      return () => {
+        document.removeEventListener('outsideClickSave', handleOutsideClickSave as EventListener);
+      };
+    }
+  }, [isEditing, editContent, line.id, onUpdate, onDelete]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -50,20 +77,11 @@ const NoteLine: React.FC<NoteLineProps> = ({
     }
   };
 
-  const handleStartEdit = () => {
-    setIsEditing(true);
+  const handleLineStartEdit = () => {
+    onStartEdit(line.id);
     setEditContent(line.content);
   };
 
-  const handleSaveEdit = () => {
-    const trimmed = editContent.trim();
-    if (trimmed) {
-      onUpdate(line.id, { content: trimmed });
-    } else {
-      onDelete(line.id);
-    }
-    setIsEditing(false);
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -76,7 +94,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
         return;
       }
       
-      setIsEditing(false);
+      onEndEdit();
       onNewLine(line.id);
     } else if (e.key === 'Tab') {
       e.preventDefault();
@@ -98,14 +116,14 @@ const NoteLine: React.FC<NoteLineProps> = ({
           // Save current line as child (indented)
           const indentedContent = '  ' + editContent;
           onUpdate(line.id, { content: indentedContent });
-          setIsEditing(false);
+          onEndEdit();
           
           // Create new child line after this one
           onNewChildLine(line.id);
         }
       }
     } else if (e.key === 'Escape') {
-      setIsEditing(false);
+      onEndEdit();
       setEditContent(line.content);
     } else if (e.key === 'Backspace') {
       // Smart backspace behavior
@@ -153,7 +171,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
           ref={inputRef}
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
-          onBlur={handleSaveEdit}
           onKeyDown={handleKeyDown}
           className="flex-1 bg-deep-navy text-off-white text-sm font-mono border-b border-soft-green focus:outline-none"
         />
@@ -163,8 +180,22 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   const isCompleted = getCompletionState();
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    // Don't start editing if clicking on checkbox or delete button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    // Only start editing if we're not already editing this line
+    if (!isEditing) {
+      handleLineStartEdit();
+    }
+  };
+
   return (
-    <div className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}>
+    <div 
+      onClick={handleRowClick}
+      className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group cursor-text ${getIndentStyle()}`}
+    >
       {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
       {line.type === 'task' && (
         <button
@@ -181,8 +212,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
       )}
       
       <div
-        onClick={handleStartEdit}
-        className={`flex-1 text-sm font-mono cursor-text ${
+        className={`flex-1 text-sm font-mono ${
           line.type === 'note' 
             ? 'text-gray-text/80 italic' 
             : isCompleted 
