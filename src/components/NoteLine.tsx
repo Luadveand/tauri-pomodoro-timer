@@ -127,6 +127,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
   if (isEditing) {
     return (
       <div className={`flex items-center gap-2 py-1 px-4 ${getIndentStyle()}`}>
+        {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
         {line.type === 'task' && (
           <div className="w-4 h-4 flex-shrink-0" />
         )}
@@ -146,6 +147,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   return (
     <div className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}>
+      {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
       {line.type === 'task' && (
         <button
           onClick={handleToggleComplete}
@@ -166,7 +168,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
           line.type === 'note' 
             ? 'text-gray-text/80 italic' 
             : isCompleted 
-              ? 'text-gray-text opacity-70' 
+              ? 'text-soft-green/90 opacity-80' 
               : 'text-off-white'
         }`}
       >

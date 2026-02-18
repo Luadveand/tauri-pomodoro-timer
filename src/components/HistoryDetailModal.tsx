@@ -101,8 +101,8 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
                   {isCompleted && '✓'}
                 </span>
               )}
-              <span className={isCompleted ? 'line-through opacity-80' : ''}>
-                {line}
+              <span className={isCompleted ? 'opacity-80' : ''}>
+                {isCompleted && trimmedLine.startsWith('✓') ? line.replace(/✓\s*/, '') : line}
               </span>
             </div>
           );
