@@ -3,34 +3,25 @@ import { LineObject } from '../types';
 
 interface NoteLineProps {
   line: LineObject;
-  parentLine?: LineObject;
   onUpdate: (id: string, updates: Partial<LineObject>) => void;
   onDelete: (id: string) => void;
-  onNewLine: (afterId: string) => void;
-  onNewChildLine: (parentId: string) => void;
-  onConvertToParent: (id: string) => void;
+  onNewLine: (afterId: string, isIndented?: boolean) => void;
   onStartEdit: (id: string) => void;
   onEndEdit: () => void;
-  isLast: boolean;
-  startEditing?: boolean;
   isEditing: boolean;
 }
 
 const NoteLine: React.FC<NoteLineProps> = ({ 
   line, 
-  parentLine,
   onUpdate, 
   onDelete, 
   onNewLine, 
-  onNewChildLine,
-  onConvertToParent,
   onStartEdit,
   onEndEdit,
-  isLast,
-  startEditing = false,
   isEditing
 }) => {
   const [editContent, setEditContent] = useState(line.content);
+  const [editingIsIndented, setEditingIsIndented] = useState(line.isIndented || false);
   const inputRef = useRef<HTMLInputElement>(null);
   
 
@@ -41,6 +32,13 @@ const NoteLine: React.FC<NoteLineProps> = ({
       inputRef.current.focus();
     }
   }, [isEditing]);
+
+  // Preserve focus when line data changes (e.g., during Tab operations)
+  useEffect(() => {
+    if (isEditing && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing, line.isIndented, line.content]);
 
   // Listen for outside click save events
   useEffect(() => {
@@ -67,8 +65,9 @@ const NoteLine: React.FC<NoteLineProps> = ({
   useEffect(() => {
     if (!isEditing) {
       setEditContent(line.content);
+      setEditingIsIndented(line.isIndented || false);
     }
-  }, [line.content, isEditing]);
+  }, [line.content, line.isIndented, isEditing]);
 
   const handleToggleComplete = () => {
     if (line.type === 'task') {
@@ -80,6 +79,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
   const handleLineStartEdit = () => {
     onStartEdit(line.id);
     setEditContent(line.content);
+    setEditingIsIndented(line.isIndented || false);
   };
 
 
@@ -87,51 +87,59 @@ const NoteLine: React.FC<NoteLineProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       const trimmed = editContent.trim();
+      
+      // Enhanced Enter behavior for empty child tasks
+      if (trimmed === '' && editingIsIndented) {
+        // Convert empty child to parent and stay in editing mode
+        // Just remove indentation from display - will be saved when editing ends
+        const unindentedContent = editContent.startsWith('  ') ? editContent.substring(2) : editContent;
+        setEditContent(unindentedContent);
+        setEditingIsIndented(false);
+        return; // Don't exit editing, don't create new line
+      }
+      
+      // Normal Enter behavior
       if (trimmed) {
-        onUpdate(line.id, { content: trimmed });
+        // Preserve the current editing indentation state
+        onUpdate(line.id, { 
+          content: trimmed,
+          isIndented: editingIsIndented 
+        });
       } else {
         onDelete(line.id);
         return;
       }
       
       onEndEdit();
-      onNewLine(line.id);
+      onNewLine(line.id, editingIsIndented);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       
-      if (e.shiftKey) {
-        // Shift+Tab to reduce indentation (existing behavior)
-        if (editContent.startsWith('  ')) {
-          const newContent = editContent.substring(2);
-          setEditContent(newContent);
-          const trimmed = newContent.trim();
-          if (trimmed) {
-            onUpdate(line.id, { content: newContent });
-          }
-        }
+      // Simple Tab cycling: Parent <-> Child - ONLY update display content
+      if (editingIsIndented) {
+        // Child -> Parent: remove indentation from display
+        const unindentedContent = editContent.startsWith('  ') ? editContent.substring(2) : editContent;
+        setEditContent(unindentedContent);
+        setEditingIsIndented(false);
       } else {
-        // Enhanced Tab behavior: indent current line + create child line
-        const trimmed = editContent.trim();
-        if (trimmed) {
-          // Save current line as child (indented)
-          const indentedContent = '  ' + editContent;
-          onUpdate(line.id, { content: indentedContent });
-          onEndEdit();
-          
-          // Create new child line after this one
-          onNewChildLine(line.id);
-        }
+        // Parent -> Child: add indentation to display
+        const indentedContent = editContent.startsWith('  ') ? editContent : '  ' + editContent;
+        setEditContent(indentedContent);
+        setEditingIsIndented(true);
       }
+      // NOTE: Actual parent/child status will be determined when editing ends based on content
     } else if (e.key === 'Escape') {
       onEndEdit();
       setEditContent(line.content);
+      setEditingIsIndented(line.isIndented || false);
     } else if (e.key === 'Backspace') {
       // Smart backspace behavior
-      if (editContent === '' && line.isIndented) {
+      if (editContent === '' && editingIsIndented) {
         // Convert child to parent when backspacing on empty indented line
         e.preventDefault();
-        onConvertToParent(line.id);
-      } else if (editContent === '' && !line.isIndented) {
+        setEditContent('');
+        setEditingIsIndented(false);
+      } else if (editContent === '' && !editingIsIndented) {
         // Delete empty parent line (existing behavior)
         e.preventDefault();
         onDelete(line.id);
@@ -151,7 +159,8 @@ const NoteLine: React.FC<NoteLineProps> = ({
   };
 
   const getIndentStyle = () => {
-    return line.isIndented ? 'ml-6' : '';
+    const isIndented = isEditing ? editingIsIndented : line.isIndented;
+    return isIndented ? 'ml-6' : '';
   };
 
   const getCompletionState = () => {
@@ -163,7 +172,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
   if (isEditing) {
     return (
       <div className={`flex items-center gap-2 py-1 px-4 ${getIndentStyle()}`}>
-        {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
+        {editingIsIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
         {line.type === 'task' && (
           <div className="w-4 h-4 flex-shrink-0" />
         )}

@@ -54,6 +54,35 @@ const NotesPanel: React.FC = () => {
   }, [currentlyEditingId]);
 
   const handleLineUpdate = (id: string, updates: Partial<any>) => {
+    // Auto-detect indentation level only if not explicitly provided
+    if (updates.content !== undefined && updates.isIndented === undefined) {
+      const isContentIndented = updates.content.startsWith('  ');
+      updates.isIndented = isContentIndented;
+    }
+    
+    // If becoming a child, assign proper parentId
+    if (updates.isIndented === true && !updates.parentId) {
+      const currentStore = useTimerStore.getState();
+      const currentLines = currentStore.lines;
+      const lineIndex = currentLines.findIndex(line => line.id === id);
+      
+      if (lineIndex > 0) {
+        // Find the previous parent task
+        for (let i = lineIndex - 1; i >= 0; i--) {
+          const previousLine = currentLines[i];
+          if (!previousLine.isIndented && previousLine.type === 'task') {
+            updates.parentId = previousLine.id;
+            break;
+          }
+        }
+      }
+    }
+    
+    // If becoming a parent, remove parentId
+    if (updates.isIndented === false) {
+      updates.parentId = undefined;
+    }
+    
     updateLine(id, updates);
     // Remove from new line tracking once it's been updated
     if (newLineIds.has(id)) {
@@ -79,21 +108,55 @@ const NotesPanel: React.FC = () => {
     }
   };
 
-  const handleNewLine = (afterId?: string) => {
+  const handleNewLine = (afterId?: string, isIndented?: boolean) => {
     const newLineId = uuidv4();
+    
+    // Use the provided indentation state or look up from store as fallback
+    let newLineIndented = false;
+    let newLineParentId: string | undefined = undefined;
+    
+    if (isIndented !== undefined) {
+      // Use the directly passed indentation state (most reliable)
+      newLineIndented = isIndented;
+      
+      // If it's indented, find the parent ID from current store
+      if (isIndented && afterId) {
+        const currentStore = useTimerStore.getState();
+        const currentLines = currentStore.lines;
+        const referenceLine = currentLines.find(line => line.id === afterId);
+        
+        // If reference line is a child, inherit its parent; if parent, make it the parent
+        if (referenceLine?.isIndented) {
+          newLineParentId = referenceLine.parentId;
+        } else {
+          newLineParentId = afterId; // Make the current line the parent
+        }
+      }
+    } else if (afterId) {
+      // Fallback: look up from store
+      const fallbackStore = useTimerStore.getState();
+      const fallbackLines = fallbackStore.lines;
+      const referenceLine = fallbackLines.find(line => line.id === afterId);
+      newLineIndented = referenceLine?.isIndented || false;
+      newLineParentId = referenceLine?.parentId;
+    }
+    
+    // Create new line with determined indentation level
     const newLine = {
       content: '', // Start with empty content for immediate editing
       type: 'task' as const,
-      completed: false
+      completed: false,
+      isIndented: newLineIndented,
+      parentId: newLineParentId
     };
     
     // Track this as a new line that should start editing
     setNewLineIds(prev => new Set(prev).add(newLineId));
     setCurrentlyEditingId(newLineId);
     
-    // Use a callback to get the most current state
-    const currentStore = useTimerStore.getState();
-    const currentLines = currentStore.lines;
+    // Get current lines for insertion logic
+    const insertionStore = useTimerStore.getState();
+    const currentLines = insertionStore.lines;
     
     if (afterId) {
       const currentIndex = currentLines.findIndex(line => line.id === afterId);
@@ -117,60 +180,7 @@ const NotesPanel: React.FC = () => {
     handleNewLine();
   };
 
-  const handleNewChildLine = (parentId: string) => {
-    const newLineId = uuidv4();
-    const newLine = {
-      content: '', // Start with empty content for immediate editing
-      type: 'task' as const,
-      completed: false,
-      isIndented: true // Child lines are indented
-    };
-    
-    // Track this as a new line that should start editing
-    setNewLineIds(prev => new Set(prev).add(newLineId));
-    setCurrentlyEditingId(newLineId);
-    
-    // Get current state and find parent line
-    const currentStore = useTimerStore.getState();
-    const currentLines = currentStore.lines;
-    const parentIndex = currentLines.findIndex(line => line.id === parentId);
-    
-    if (parentIndex === -1) {
-      console.warn('⚠️ parentId not found, appending to end');
-      const newLines = [...currentLines, { ...newLine, id: newLineId }];
-      setLines(newLines);
-    } else {
-      // Insert new child line after the parent
-      const newLines = [...currentLines];
-      newLines.splice(parentIndex + 1, 0, { ...newLine, id: newLineId });
-      setLines(newLines);
-    }
-  };
 
-  const handleConvertToParent = (lineId: string) => {
-    const currentStore = useTimerStore.getState();
-    const currentLines = currentStore.lines;
-    const lineIndex = currentLines.findIndex(line => line.id === lineId);
-    
-    if (lineIndex === -1) {
-      console.warn('⚠️ lineId not found for conversion');
-      return;
-    }
-    
-    const line = currentLines[lineIndex];
-    
-    // Convert child to parent by removing indentation and parentId
-    const updatedLine = {
-      ...line,
-      isIndented: false,
-      parentId: undefined,
-      content: line.content.startsWith('  ') ? line.content.substring(2) : line.content
-    };
-    
-    const newLines = [...currentLines];
-    newLines[lineIndex] = updatedLine;
-    setLines(newLines);
-  };
 
   const parseTaskCount = (currentLines: typeof lines): { completed: number; total: number } => {
     // Only count parent tasks (top-level tasks), not children - consistent with history entries
@@ -192,10 +202,21 @@ const NotesPanel: React.FC = () => {
 
   // Handle starting edit on a line
   const handleStartEdit = (lineId: string) => {
-    // Only allow starting edit if nothing is currently being edited
-    if (!currentlyEditingId) {
-      setCurrentlyEditingId(lineId);
+    // If already editing a different line, save it first
+    if (currentlyEditingId && currentlyEditingId !== lineId) {
+      // Save the currently editing line automatically
+      const currentEditingLine = lines.find(line => line.id === currentlyEditingId);
+      if (currentEditingLine) {
+        // The line will save its content via the outside click save mechanism
+        const saveEvent = new CustomEvent('outsideClickSave', { 
+          detail: { lineId: currentlyEditingId }
+        });
+        document.dispatchEvent(saveEvent);
+      }
     }
+    
+    // Set new line as currently editing
+    setCurrentlyEditingId(lineId);
   };
 
   // Handle ending edit (save and exit editing mode)
@@ -253,21 +274,15 @@ const NotesPanel: React.FC = () => {
         ) : (
           <div className="py-2">
             {lines.map((line, index) => {
-              const parentLine = line.parentId ? lines.find(l => l.id === line.parentId) : undefined;
               return (
                 <NoteLine
                   key={line.id}
                   line={line}
-                  parentLine={parentLine}
                   onUpdate={handleLineUpdate}
                   onDelete={handleLineDelete}
                   onNewLine={handleNewLine}
-                  onNewChildLine={handleNewChildLine}
-                  onConvertToParent={handleConvertToParent}
                   onStartEdit={handleStartEdit}
                   onEndEdit={handleEndEdit}
-                  isLast={index === lines.length - 1}
-                  startEditing={newLineIds.has(line.id)}
                   isEditing={currentlyEditingId === line.id}
                 />
               );
