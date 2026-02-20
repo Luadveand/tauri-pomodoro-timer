@@ -45,6 +45,7 @@ interface TimerStore {
   parseLineContext: (targetLine: string, notesSnapshot: string) => { isChild: boolean; parentIndex: number; targetIndex: number };
   extractTaskHierarchy: (targetLine: string, notesSnapshot: string) => string[];
   mergeWithCurrentNotes: (tasksToRestore: string[], currentNotes: string) => string;
+  reorderLines: (activeId: string, overId: string) => void;
   cleanupNotes: (settings: Settings) => void;
   savePhaseSnapshot: (settings: Settings, statusOverride?: 'completed' | 'skipped' | 'stopped') => Promise<void>;
 }
@@ -548,6 +549,94 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   deleteLine: (id) => {
     const state = get();
     const newLines = state.lines.filter(line => line.id !== id);
+    get().setLines(newLines);
+  },
+
+  reorderLines: (activeId, overId) => {
+    if (activeId === overId) return;
+
+    const state = get();
+    const lines = [...state.lines];
+
+    const activeIndex = lines.findIndex(l => l.id === activeId);
+    const overIndex = lines.findIndex(l => l.id === overId);
+    if (activeIndex === -1 || overIndex === -1) return;
+
+    const activeLine = lines[activeIndex];
+
+    // Collect the block to move: if it's a parent, grab its children too
+    let blockToMove: LineObject[];
+    let blockStartIndex = activeIndex;
+    let blockLength: number;
+
+    if (!activeLine.isIndented) {
+      // Parent: collect it + all consecutive children
+      blockToMove = [lines[activeIndex]];
+      let i = activeIndex + 1;
+      while (i < lines.length && lines[i].parentId === activeLine.id) {
+        blockToMove.push(lines[i]);
+        i++;
+      }
+      blockLength = blockToMove.length;
+    } else {
+      // Child: move just the single item
+      blockToMove = [lines[activeIndex]];
+      blockLength = 1;
+    }
+
+    // Remove the block from the array
+    const remaining = [
+      ...lines.slice(0, blockStartIndex),
+      ...lines.slice(blockStartIndex + blockLength),
+    ];
+
+    // Find the new insert position based on overId in the remaining array
+    let insertIndex = remaining.findIndex(l => l.id === overId);
+    if (insertIndex === -1) {
+      insertIndex = remaining.length;
+    }
+
+    // Insert after the over item if we were originally below it, before if above
+    if (activeIndex > overIndex) {
+      // Moving up: insert before the over item
+    } else {
+      // Moving down: insert after the over item (+ its children block)
+      const overLine = remaining[insertIndex];
+      if (overLine && !overLine.isIndented) {
+        // Skip past its children
+        let j = insertIndex + 1;
+        while (j < remaining.length && remaining[j].parentId === overLine.id) {
+          j++;
+        }
+        insertIndex = j;
+      } else {
+        insertIndex = insertIndex + 1;
+      }
+    }
+
+    // Re-parent moved children if they land under a new parent
+    const updatedBlock = blockToMove.map(item => {
+      if (item.isIndented) {
+        // Find new parent: look backwards from insert position for a non-indented line
+        const linesBefore = remaining.slice(0, insertIndex);
+        let newParentId: string | undefined;
+        for (let k = linesBefore.length - 1; k >= 0; k--) {
+          if (!linesBefore[k].isIndented && linesBefore[k].type === 'task') {
+            newParentId = linesBefore[k].id;
+            break;
+          }
+        }
+        return { ...item, parentId: newParentId };
+      }
+      return item;
+    });
+
+    const newLines = [
+      ...remaining.slice(0, insertIndex),
+      ...updatedBlock,
+      ...remaining.slice(insertIndex),
+    ];
+
     get().setLines(newLines);
   },
 

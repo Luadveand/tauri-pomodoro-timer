@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LineObject } from '../types';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface NoteLineProps {
   line: LineObject;
@@ -9,23 +11,36 @@ interface NoteLineProps {
   onStartEdit: (id: string) => void;
   onEndEdit: () => void;
   isEditing: boolean;
+  isDragging?: boolean;
 }
 
-const NoteLine: React.FC<NoteLineProps> = ({ 
-  line, 
-  onUpdate, 
-  onDelete, 
-  onNewLine, 
+const NoteLine: React.FC<NoteLineProps> = ({
+  line,
+  onUpdate,
+  onDelete,
+  onNewLine,
   onStartEdit,
   onEndEdit,
-  isEditing
+  isEditing,
+  isDragging = false,
 }) => {
   const [editContent, setEditContent] = useState(line.content);
   const [editingIsIndented, setEditingIsIndented] = useState(line.isIndented || false);
   const inputRef = useRef<HTMLInputElement>(null);
-  
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: line.id, disabled: isEditing });
 
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -71,7 +86,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   const handleToggleComplete = () => {
     if (line.type === 'task') {
-      // Both parent and child tasks can be toggled
       onUpdate(line.id, { completed: !line.completed });
     }
   };
@@ -82,7 +96,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
     setEditingIsIndented(line.isIndented || false);
   };
 
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -91,16 +104,12 @@ const NoteLine: React.FC<NoteLineProps> = ({
       e.preventDefault();
       const trimmed = editContent.trim();
 
-      // Enhanced Enter behavior for empty child tasks
       if (trimmed === '' && editingIsIndented) {
-        // Convert empty child to parent and stay in editing mode
         setEditingIsIndented(false);
-        return; // Don't exit editing, don't create new line
+        return;
       }
 
-      // Normal Enter behavior
       if (trimmed) {
-        // Preserve the current editing indentation state
         onUpdate(line.id, {
           content: trimmed,
           isIndented: editingIsIndented
@@ -114,26 +123,20 @@ const NoteLine: React.FC<NoteLineProps> = ({
       onNewLine(line.id, editingIsIndented);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      
-      // Simple Tab cycling: Parent <-> Child — only toggle indent state, CSS handles the visual
       setEditingIsIndented(!editingIsIndented);
     } else if (e.key === 'Escape') {
       onEndEdit();
       setEditContent(line.content);
       setEditingIsIndented(line.isIndented || false);
     } else if (e.key === 'Backspace') {
-      // Smart backspace behavior
       if (editContent === '' && editingIsIndented) {
-        // Convert child to parent when backspacing on empty indented line
         e.preventDefault();
         setEditContent('');
         setEditingIsIndented(false);
       } else if (editContent === '' && !editingIsIndented) {
-        // Delete empty parent line (existing behavior)
         e.preventDefault();
         onDelete(line.id);
       }
-      // If line has content, allow normal backspace behavior
     }
   };
 
@@ -150,14 +153,33 @@ const NoteLine: React.FC<NoteLineProps> = ({
   };
 
   const getCompletionState = () => {
-    // Each task shows its own completion state - no inheritance
-    // The cascading logic is handled in the store, not the UI
     return line.completed;
   };
 
+  // Drag handle — 6-dot grip icon, visible on hover
+  const DragHandle = () => (
+    <button
+      className="flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-text/0 group-hover:text-gray-text/40 hover:!text-gray-text/70 transition-colors touch-none"
+      {...attributes}
+      {...listeners}
+      tabIndex={-1}
+      aria-label="Drag to reorder"
+    >
+      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+        <circle cx="3" cy="2" r="1.2" />
+        <circle cx="7" cy="2" r="1.2" />
+        <circle cx="3" cy="7" r="1.2" />
+        <circle cx="7" cy="7" r="1.2" />
+        <circle cx="3" cy="12" r="1.2" />
+        <circle cx="7" cy="12" r="1.2" />
+      </svg>
+    </button>
+  );
+
   if (isEditing) {
     return (
-      <div className={`flex items-center gap-2 py-1 px-4 ${getIndentStyle()}`}>
+      <div ref={setNodeRef} style={style} className={`flex items-center gap-2 py-1 px-4 group ${getIndentStyle()}`}>
+        <div className="w-5 flex-shrink-0" />
         {editingIsIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
         {line.type === 'task' && (
           <button
@@ -186,21 +208,23 @@ const NoteLine: React.FC<NoteLineProps> = ({
   const isCompleted = getCompletionState();
 
   const handleRowClick = (e: React.MouseEvent) => {
-    // Don't start editing if clicking on checkbox or delete button
+    // Don't start editing if clicking on drag handle, checkbox, or delete button
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    // Only start editing if we're not already editing this line
     if (!isEditing) {
       handleLineStartEdit();
     }
   };
 
   return (
-    <div 
+    <div
+      ref={setNodeRef}
+      style={style}
       onClick={handleRowClick}
       className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group cursor-text ${getIndentStyle()}`}
     >
+      <DragHandle />
       {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
       {line.type === 'task' && (
         <button
@@ -215,19 +239,19 @@ const NoteLine: React.FC<NoteLineProps> = ({
           {isCompleted && <span className="text-xs leading-none font-bold">✓</span>}
         </button>
       )}
-      
+
       <div
         className={`flex-1 text-sm font-mono ${
-          line.type === 'note' 
-            ? 'text-gray-text/80 italic' 
-            : isCompleted 
-              ? 'text-soft-green/90 opacity-80' 
+          line.type === 'note'
+            ? 'text-gray-text/80 italic'
+            : isCompleted
+              ? 'text-soft-green/90 opacity-80'
               : 'text-off-white'
         }`}
       >
         {getDisplayContent()}
       </div>
-      
+
       <button
         onClick={() => onDelete(line.id)}
         className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:text-tomato"

@@ -1,8 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import { LineObject } from '../types';
 import NoteLine from './NoteLine';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import type { Modifier } from '@dnd-kit/core';
+
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+});
 
 const NotesPanel: React.FC = () => {
   const {
@@ -10,11 +30,48 @@ const NotesPanel: React.FC = () => {
     setLines,
     updateLine,
     deleteLine,
+    reorderLines,
   } = useTimerStore();
-  
+
   const [newLineIds, setNewLineIds] = React.useState<Set<string>>(new Set());
   const [currentlyEditingId, setCurrentlyEditingId] = React.useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Configure pointer sensor with activation distance to distinguish clicks from drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+    // Exit editing mode when starting a drag
+    if (currentlyEditingId) {
+      const saveEvent = new CustomEvent('outsideClickSave', {
+        detail: { lineId: currentlyEditingId }
+      });
+      document.dispatchEvent(saveEvent);
+      setCurrentlyEditingId(null);
+    }
+  }, [currentlyEditingId]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      reorderLines(active.id as string, over.id as string);
+    }
+  }, [reorderLines]);
+
+  const activeDragLine = activeDragId ? lines.find(l => l.id === activeDragId) : null;
+
+  // Build sortable IDs — for parent lines, use the parent ID as the sortable item
+  // (children are rendered inside their parent's sortable wrapper)
+  const sortableIds = lines.map(line => line.id);
 
   // Handle outside clicks to exit editing mode
   useEffect(() => {
@@ -24,7 +81,7 @@ const NotesPanel: React.FC = () => {
         // Trigger save and exit - this will be handled by NoteLine component
         if (currentlyEditingId) {
           // Create a custom event to trigger save in the currently editing line
-          const saveEvent = new CustomEvent('outsideClickSave', { 
+          const saveEvent = new CustomEvent('outsideClickSave', {
             detail: { lineId: currentlyEditingId }
           });
           document.dispatchEvent(saveEvent);
@@ -47,13 +104,13 @@ const NotesPanel: React.FC = () => {
       const isContentIndented = updates.content.startsWith('  ');
       updates.isIndented = isContentIndented;
     }
-    
+
     // If becoming a child, assign proper parentId
     if (updates.isIndented === true && !updates.parentId) {
       const currentStore = useTimerStore.getState();
       const currentLines = currentStore.lines;
       const lineIndex = currentLines.findIndex(line => line.id === id);
-      
+
       if (lineIndex > 0) {
         // Find the previous parent task
         for (let i = lineIndex - 1; i >= 0; i--) {
@@ -65,12 +122,12 @@ const NotesPanel: React.FC = () => {
         }
       }
     }
-    
+
     // If becoming a parent, remove parentId
     if (updates.isIndented === false) {
       updates.parentId = undefined;
     }
-    
+
     updateLine(id, updates);
     // Remove from new line tracking once it's been updated
     if (newLineIds.has(id)) {
@@ -98,21 +155,21 @@ const NotesPanel: React.FC = () => {
 
   const handleNewLine = (afterId?: string, isIndented?: boolean) => {
     const newLineId = uuidv4();
-    
+
     // Use the provided indentation state or look up from store as fallback
     let newLineIndented = false;
     let newLineParentId: string | undefined = undefined;
-    
+
     if (isIndented !== undefined) {
       // Use the directly passed indentation state (most reliable)
       newLineIndented = isIndented;
-      
+
       // If it's indented, find the parent ID from current store
       if (isIndented && afterId) {
         const currentStore = useTimerStore.getState();
         const currentLines = currentStore.lines;
         const referenceLine = currentLines.find(line => line.id === afterId);
-        
+
         // If reference line is a child, inherit its parent; if parent, make it the parent
         if (referenceLine?.isIndented) {
           newLineParentId = referenceLine.parentId;
@@ -128,7 +185,7 @@ const NotesPanel: React.FC = () => {
       newLineIndented = referenceLine?.isIndented || false;
       newLineParentId = referenceLine?.parentId;
     }
-    
+
     // Create new line with determined indentation level
     const newLine = {
       content: '', // Start with empty content for immediate editing
@@ -137,20 +194,20 @@ const NotesPanel: React.FC = () => {
       isIndented: newLineIndented,
       parentId: newLineParentId
     };
-    
+
     // Track this as a new line that should start editing
     setNewLineIds(prev => new Set(prev).add(newLineId));
     setCurrentlyEditingId(newLineId);
-    
+
     // Get current lines for insertion logic
     const insertionStore = useTimerStore.getState();
     const currentLines = insertionStore.lines;
-    
+
     if (afterId) {
       const currentIndex = currentLines.findIndex(line => line.id === afterId);
-      
+
       if (currentIndex === -1) {
-        console.warn('⚠️ afterId not found, appending to end');
+        console.warn('afterId not found, appending to end');
         const newLines = [...currentLines, { ...newLine, id: newLineId }];
         setLines(newLines);
       } else {
@@ -204,13 +261,13 @@ const NotesPanel: React.FC = () => {
       const currentEditingLine = lines.find(line => line.id === currentlyEditingId);
       if (currentEditingLine) {
         // The line will save its content via the outside click save mechanism
-        const saveEvent = new CustomEvent('outsideClickSave', { 
+        const saveEvent = new CustomEvent('outsideClickSave', {
           detail: { lineId: currentlyEditingId }
         });
         document.dispatchEvent(saveEvent);
       }
     }
-    
+
     // Set new line as currently editing
     setCurrentlyEditingId(lineId);
   };
@@ -232,9 +289,9 @@ const NotesPanel: React.FC = () => {
           )}
         </div>
       </div>
-      
-      <div 
-        className="flex-1 overflow-y-auto min-h-0" 
+
+      <div
+        className="flex-1 overflow-y-auto min-h-0"
         onClick={handlePanelClick}
       >
         {lines.length === 0 ? (
@@ -248,22 +305,56 @@ const NotesPanel: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="py-2">
-            {lines.map((line) => {
-              return (
-                <NoteLine
-                  key={line.id}
-                  line={line}
-                  onUpdate={handleLineUpdate}
-                  onDelete={handleLineDelete}
-                  onNewLine={handleNewLine}
-                  onStartEdit={handleStartEdit}
-                  onEndEdit={handleEndEdit}
-                  isEditing={currentlyEditingId === line.id}
-                />
-              );
-            })}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToVerticalAxis]}
+          >
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              <div className="py-2">
+                {lines.map((line) => {
+                  return (
+                    <NoteLine
+                      key={line.id}
+                      line={line}
+                      onUpdate={handleLineUpdate}
+                      onDelete={handleLineDelete}
+                      onNewLine={handleNewLine}
+                      onStartEdit={handleStartEdit}
+                      onEndEdit={handleEndEdit}
+                      isEditing={currentlyEditingId === line.id}
+                      isDragging={activeDragId === line.id}
+                    />
+                  );
+                })}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeDragLine ? (
+                <div className="bg-lighter-navy/90 border border-soft-green/30 rounded px-4 py-1 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    {activeDragLine.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
+                    {activeDragLine.type === 'task' && (
+                      <div className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center flex-shrink-0 ${
+                        activeDragLine.completed
+                          ? 'border-soft-green bg-soft-green text-deep-navy'
+                          : 'border-gray-text/40 bg-deep-navy'
+                      }`}>
+                        {activeDragLine.completed && <span className="text-xs leading-none font-bold">✓</span>}
+                      </div>
+                    )}
+                    <span className={`text-sm font-mono ${
+                      activeDragLine.completed ? 'text-soft-green/90 opacity-80' : 'text-off-white'
+                    }`}>
+                      {activeDragLine.content}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
       <div className="px-4 py-2 border-t border-gray-text/10 text-xs text-gray-text/40 font-mono">
@@ -272,7 +363,7 @@ const NotesPanel: React.FC = () => {
         ) : lines.length === 0 ? (
           <span>Click anywhere to start adding tasks</span>
         ) : (
-          <span>Click empty space to add a task</span>
+          <span>Drag to reorder · Click to edit · Click empty space to add</span>
         )}
       </div>
     </div>
