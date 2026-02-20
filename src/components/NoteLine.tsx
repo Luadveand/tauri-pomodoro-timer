@@ -160,7 +160,17 @@ const NoteLine: React.FC<NoteLineProps> = ({
       <div className={`flex items-center gap-2 py-1 px-4 ${getIndentStyle()}`}>
         {editingIsIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
         {line.type === 'task' && (
-          <div className="w-4 h-4 flex-shrink-0" />
+          <button
+            onClick={handleToggleComplete}
+            className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center flex-shrink-0 transition-all ${
+              line.completed
+                ? 'border-soft-green bg-soft-green text-deep-navy'
+                : 'border-gray-text/40 bg-deep-navy hover:border-soft-green hover:bg-soft-green/10'
+            }`}
+            title={line.completed ? 'Mark as incomplete' : 'Mark as completed'}
+          >
+            {line.completed && <span className="text-xs leading-none font-bold">✓</span>}
+          </button>
         )}
         <input
           ref={inputRef}
