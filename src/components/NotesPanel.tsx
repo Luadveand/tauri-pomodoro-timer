@@ -231,9 +231,6 @@ const NotesPanel: React.FC = () => {
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-text/70 mt-1">
-          Ctrl+Space to toggle task completion • Click anywhere to create tasks
-        </p>
       </div>
       
       <div 
@@ -266,15 +263,16 @@ const NotesPanel: React.FC = () => {
                 />
               );
             })}
-            <div className="px-4 py-2">
-              <button
-                onClick={() => handleNewLine()}
-                className="text-gray-text/50 text-sm hover:text-soft-green transition-colors"
-              >
-                + Add new line
-              </button>
-            </div>
           </div>
+        )}
+      </div>
+      <div className="px-4 py-2 border-t border-gray-text/10 text-xs text-gray-text/40 font-mono">
+        {currentlyEditingId ? (
+          <span>Enter new task · Tab indent · Esc cancel · Ctrl+Space complete</span>
+        ) : lines.length === 0 ? (
+          <span>Click anywhere to start adding tasks</span>
+        ) : (
+          <span>Click empty space to add a task</span>
         )}
       </div>
     </div>
