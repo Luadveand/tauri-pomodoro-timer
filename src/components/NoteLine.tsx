@@ -48,6 +48,13 @@ const NoteLine: React.FC<NoteLineProps> = ({
     }
   }, [isEditing]);
 
+  // Refocus input after a drag completes while still in editing mode
+  useEffect(() => {
+    if (!isDragging && isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isDragging, isEditing]);
+
   // Preserve focus when line data changes (e.g., during Tab operations)
   useEffect(() => {
     if (isEditing && inputRef.current && document.activeElement !== inputRef.current) {
