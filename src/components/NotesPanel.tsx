@@ -49,15 +49,7 @@ const NotesPanel: React.FC = () => {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
-    // Exit editing mode when starting a drag
-    if (currentlyEditingId) {
-      const saveEvent = new CustomEvent('outsideClickSave', {
-        detail: { lineId: currentlyEditingId }
-      });
-      document.dispatchEvent(saveEvent);
-      setCurrentlyEditingId(null);
-    }
-  }, [currentlyEditingId]);
+  }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragId(null);

@@ -34,7 +34,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: line.id, disabled: isEditing });
+  } = useSortable({ id: line.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -179,7 +179,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
   if (isEditing) {
     return (
       <div ref={setNodeRef} style={style} className={`flex items-center gap-2 py-1 px-4 group ${getIndentStyle()}`}>
-        <div className="w-5 flex-shrink-0" />
+        <DragHandle />
         {editingIsIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
         {line.type === 'task' && (
           <button
