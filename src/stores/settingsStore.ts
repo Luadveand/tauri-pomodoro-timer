@@ -20,7 +20,7 @@ interface SettingsStore {
   loadSettings: (settings: Settings) => void;
 }
 
-const defaultSettings: Settings = {
+export const defaultSettings: Settings = {
   focusDuration: 25,
   shortBreakDuration: 5,
   longBreakDuration: 15,

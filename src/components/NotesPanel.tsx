@@ -1,32 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import { useTimerStore } from '../stores/timerStore';
+import { LineObject } from '../types';
 import NoteLine from './NoteLine';
 import { v4 as uuidv4 } from 'uuid';
 
 const NotesPanel: React.FC = () => {
-  const { 
-    lines, 
-    setLines, 
-    updateLine, 
-    deleteLine, 
-    addLine, 
-    parseNotesToLines, 
-    activeNotes 
+  const {
+    lines,
+    setLines,
+    updateLine,
+    deleteLine,
   } = useTimerStore();
   
   const [newLineIds, setNewLineIds] = React.useState<Set<string>>(new Set());
   const [currentlyEditingId, setCurrentlyEditingId] = React.useState<string | null>(null);
-  const [hasInitialized, setHasInitialized] = React.useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Only parse activeNotes to lines on initial load, never again
-    if (activeNotes && lines.length === 0 && !hasInitialized) {
-      const parsedLines = parseNotesToLines(activeNotes);
-      setLines(parsedLines);
-      setHasInitialized(true);
-    }
-  }, [activeNotes, lines.length, hasInitialized, parseNotesToLines, setLines]);
 
   // Handle outside clicks to exit editing mode
   useEffect(() => {
@@ -53,7 +41,7 @@ const NotesPanel: React.FC = () => {
     }
   }, [currentlyEditingId]);
 
-  const handleLineUpdate = (id: string, updates: Partial<any>) => {
+  const handleLineUpdate = (id: string, updates: Partial<LineObject>) => {
     // Auto-detect indentation level only if not explicitly provided
     if (updates.content !== undefined && updates.isIndented === undefined) {
       const isContentIndented = updates.content.startsWith('  ');
@@ -219,25 +207,8 @@ const NotesPanel: React.FC = () => {
     setCurrentlyEditingId(lineId);
   };
 
-  // Handle ending edit (save and exit editing mode)
-  const handleEndEdit = (shouldSaveContent: boolean = false, content?: string) => {
-    // Save content if provided
-    if (shouldSaveContent && currentlyEditingId && content !== undefined) {
-      const trimmed = content.trim();
-      if (trimmed) {
-        updateLine(currentlyEditingId, { content: trimmed });
-      } else {
-        // Only delete if it's a brand new line that never had content
-        if (newLineIds.has(currentlyEditingId)) {
-          deleteLine(currentlyEditingId);
-          setNewLineIds(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(currentlyEditingId);
-            return newSet;
-          });
-        }
-      }
-    }
+  // Handle ending edit (exit editing mode)
+  const handleEndEdit = () => {
     setCurrentlyEditingId(null);
   };
 
@@ -273,7 +244,7 @@ const NotesPanel: React.FC = () => {
           </div>
         ) : (
           <div className="py-2">
-            {lines.map((line, index) => {
+            {lines.map((line) => {
               return (
                 <NoteLine
                   key={line.id}

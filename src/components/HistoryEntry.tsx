@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { HistoryEntry as HistoryEntryType } from '../types';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { useTimerStore } from '../stores/timerStore';
 import HistoryDetailModal from './HistoryDetailModal';
+import { formatTime, getPhaseText, getStatusIcon, getStatusColor } from '../utils/historyHelpers';
 
 interface HistoryEntryProps {
   entry: HistoryEntryType;
@@ -10,50 +10,7 @@ interface HistoryEntryProps {
 }
 
 const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
-  const { restoreFromHistory } = useTimerStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const formatTime = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  const getPhaseText = (phase: string, duration: number): string => {
-    const phaseNames = {
-      focus: 'Focus',
-      shortBreak: 'Short Break',
-      longBreak: 'Long Break',
-    };
-    return `${phaseNames[phase as keyof typeof phaseNames]} (${duration} min)`;
-  };
-
-  const getStatusIcon = (status: string): string => {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'skipped':
-        return '⏭';
-      case 'stopped':
-        return '⏹';
-      default:
-        return '○';
-    }
-  };
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'completed':
-        return 'text-soft-green';
-      case 'skipped':
-      case 'stopped':
-        return 'text-gray-text';
-      default:
-        return 'text-off-white';
-    }
-  };
 
   const parseTaskCount = (notes: string): { completed: number; total: number } => {
     if (!notes) return { completed: 0, total: 0 };

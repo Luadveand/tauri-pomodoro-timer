@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSettingsStore, Settings } from '../stores/settingsStore';
+import { useSettingsStore, Settings, defaultSettings } from '../stores/settingsStore';
 import { useTimerStore } from '../stores/timerStore';
 import { ask } from '@tauri-apps/plugin-dialog';
 
@@ -14,16 +14,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
 
   const handleChange = (key: keyof Settings, value: number | boolean) => {
-    // Validate numeric inputs to ensure minimum value of 1
+    // Validate numeric inputs to ensure min/max per PRD ranges
     if (typeof value === 'number') {
-      if (key === 'focusDuration' && (isNaN(value) || value < 1)) {
-        value = 1;
-      } else if (key === 'shortBreakDuration' && (isNaN(value) || value < 0.5)) {
-        value = 0.5;
-      } else if (key === 'longBreakDuration' && (isNaN(value) || value < 0.5)) {
-        value = 0.5;
-      } else if (key === 'roundsBeforeLongBreak' && (isNaN(value) || value < 1)) {
-        value = 1;
+      if (isNaN(value)) value = 1;
+      if (key === 'focusDuration') {
+        value = Math.max(1, Math.min(120, value));
+      } else if (key === 'shortBreakDuration') {
+        value = Math.max(0.5, Math.min(60, value));
+      } else if (key === 'longBreakDuration') {
+        value = Math.max(0.5, Math.min(60, value));
+      } else if (key === 'roundsBeforeLongBreak') {
+        value = Math.max(1, Math.min(20, Math.floor(value)));
       }
     }
 
@@ -52,35 +53,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       
       if (confirmed) {
         await resetSettings();
-        const defaultSettings = {
-          focusDuration: 25,
-          shortBreakDuration: 5,
-          longBreakDuration: 15,
-          roundsBeforeLongBreak: 4,
-          soundEnabled: true,
-          notificationsEnabled: true,
-          alwaysOnTop: false,
-          debugPanelEnabled: localSettings.debugPanelEnabled,
-          keepCompletedAcrossPhases: false,
-        };
-        setLocalSettings(defaultSettings);
+        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled });
       }
     } catch (error) {
       const confirmed = window.confirm('Are you sure you want to restore all timer settings to their default values? This will not affect your history.');
       if (confirmed) {
         await resetSettings();
-        const defaultSettings = {
-          focusDuration: 25,
-          shortBreakDuration: 5,
-          longBreakDuration: 15,
-          roundsBeforeLongBreak: 4,
-          soundEnabled: true,
-          notificationsEnabled: true,
-          alwaysOnTop: false,
-          debugPanelEnabled: localSettings.debugPanelEnabled,
-          keepCompletedAcrossPhases: false,
-        };
-        setLocalSettings(defaultSettings);
+        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled });
       }
     }
   };
@@ -129,7 +108,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div 
-        className="bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden"
+        className="bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -147,7 +126,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4 overflow-y-auto">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto min-h-0 flex-1">
           {/* Focus Duration */}
           <div>
             <label className="block text-sm font-medium text-off-white mb-1">

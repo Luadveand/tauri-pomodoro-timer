@@ -2,7 +2,6 @@ import { Settings } from '../stores/settingsStore';
 import { HistoryEntry } from '../types';
 
 let store: any = null;
-let isInBrowser = false;
 
 // Check if we're in browser mode (not Tauri)
 const isTauriApp = () => {
@@ -49,14 +48,11 @@ const getStore = async (): Promise<any> => {
         const { Store } = await import('@tauri-apps/plugin-store');
         const storePath = 'settings.dat';
         store = await Store.load(storePath);
-        isInBrowser = false;
       } catch (error) {
         store = new BrowserStore();
-        isInBrowser = true;
       }
     } else {
       store = new BrowserStore();
-      isInBrowser = true;
     }
   }
   return store;
@@ -87,9 +83,9 @@ const defaultData: AppData = {
 export const loadAppData = async (): Promise<AppData> => {
   try {
     const storeInstance = await getStore();
-    const settings = await storeInstance.get<Settings>('settings');
-    const history = await storeInstance.get<HistoryEntry[]>('history');
-    const activeNotes = await storeInstance.get<string>('activeNotes');
+    const settings = await storeInstance.get('settings') as Settings | null;
+    const history = await storeInstance.get('history') as HistoryEntry[] | null;
+    const activeNotes = await storeInstance.get('activeNotes') as string | null;
 
     return {
       settings: settings || defaultData.settings,
@@ -168,11 +164,11 @@ export const testStore = async (): Promise<void> => {
     // Test saving
     await storeInstance.save();
 
-    // Test getting the value
-    const value = await storeInstance.get('test');
+    // Test getting the value back
+    await storeInstance.get('test');
 
-    // Test getting all keys
-    const keys = await storeInstance.keys();
+    // Test listing keys
+    await storeInstance.keys();
 
   } catch (error) {
     console.error('=== STORE TEST FAILED ===', error);

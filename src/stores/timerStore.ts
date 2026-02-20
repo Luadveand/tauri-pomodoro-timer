@@ -19,7 +19,6 @@ interface TimerStore {
 
   startTimer: () => void;
   pauseTimer: () => void;
-  stopTimer: (settings: Settings) => void;
   skipPhase: (settings: Settings) => void;
   setTimeLeft: (time: number) => void;
   completePhase: (settings: Settings) => void;
@@ -47,7 +46,7 @@ interface TimerStore {
   extractTaskHierarchy: (targetLine: string, notesSnapshot: string) => string[];
   mergeWithCurrentNotes: (tasksToRestore: string[], currentNotes: string) => string;
   cleanupNotes: (settings: Settings) => void;
-  savePhaseSnapshot: (settings: Settings) => Promise<void>;
+  savePhaseSnapshot: (settings: Settings, statusOverride?: 'completed' | 'skipped' | 'stopped') => Promise<void>;
 }
 
 export const useTimerStore = create<TimerStore>((set, get) => ({
@@ -61,31 +60,14 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   lines: [],
 
   startTimer: () => {
-    const state = get();
-    const wasIdle = state.status === 'idle';
-    // Timer started
     set({ status: 'running' });
   },
 
   pauseTimer: () => set({ status: 'paused' }),
 
-  stopTimer: (settings: Settings) => {
-    const state = get();
-    if (state.status === 'running' || state.status === 'paused') {
-      // Save snapshot at END of phase before stopping
-      get().savePhaseSnapshot(settings);
-      
-      set({
-        status: 'idle',
-        timeLeft: getDurationForPhase(state.currentPhase, settings) * 60,
-      });
-    }
-  },
-
   skipPhase: (settings: Settings) => {
-    const state = get();
-    // Save snapshot at END of phase before skipping
-    get().savePhaseSnapshot(settings);
+    // Save snapshot at END of phase before skipping — always mark as 'skipped'
+    get().savePhaseSnapshot(settings, 'skipped');
     get().nextPhase(settings);
   },
 
@@ -198,7 +180,16 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   },
 
   resetAllData: async () => {
-    set({ history: [], status: 'idle', currentPhase: 'focus', currentRound: 1, activeNotes: '' });
+    set({
+      history: [],
+      status: 'idle',
+      currentPhase: 'focus',
+      currentRound: 1,
+      totalRounds: 4,
+      timeLeft: 25 * 60,
+      activeNotes: '',
+      lines: [],
+    });
     try {
       await clearAllData();
     } catch (error) {
@@ -416,10 +407,7 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     }
     
     const cleanedNotes = cleanedLines.join('\n').trim();
-    const originalLineCount = state.activeNotes.split('\n').filter(l => l.trim()).length;
-    const cleanedLineCount = cleanedLines.length;
-    
-    
+
     set({ activeNotes: cleanedNotes });
     
     // Also update the lines array to sync with the cleaned notes
@@ -430,43 +418,37 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     });
   },
 
-  savePhaseSnapshot: async (settings: Settings) => {
+  savePhaseSnapshot: async (settings: Settings, statusOverride?: 'completed' | 'skipped' | 'stopped') => {
     const state = get();
-    const lines = state.activeNotes.split('\n').filter(l => l.trim());
-    const tasks = lines.filter(line => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith('#') && !line.startsWith('\t') && !line.startsWith('  ');
-    });
-    const completedTasks = tasks.filter(line => line.trim().startsWith('✓'));
-    
+
+    const snapshotStatus = statusOverride
+      ?? (state.status === 'running' ? 'completed' : (state.status === 'paused' ? 'stopped' : 'skipped'));
+
     const entry: HistoryEntry = {
       id: uuidv4(),
       timestamp: new Date().toISOString(),
       phase: state.currentPhase,
       durationMinutes: getDurationForPhase(state.currentPhase, settings),
-      status: state.status === 'running' ? 'completed' : (state.status === 'paused' ? 'stopped' : 'skipped'),
+      status: snapshotStatus,
       notesSnapshot: state.activeNotes,
     };
-    
-    // Snapshot saved
-    
+
     await get().addHistoryEntry(entry);
   },
 
   setLines: async (lines) => {
-
     // Only convert to notes for storage if all lines have content
     const hasEmptyLines = lines.some(line => line.content.trim() === '');
-    
+
     if (hasEmptyLines) {
       // Direct update without string conversion to preserve empty editing lines
       set({ lines });
     } else {
-      // Normal flow with string conversion and relationship parsing
+      // Convert to notes string for persistence but keep the existing lines array
+      // with stable IDs — never round-trip through parseNotesToLines here
       const notes = get().linesToNotes(lines);
-      const reparsedLines = get().parseNotesToLines(notes);
-      
-      set({ activeNotes: notes, lines: reparsedLines });
+
+      set({ activeNotes: notes, lines });
       try {
         await saveActiveNotes(notes);
       } catch (error) {
@@ -579,8 +561,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     for (const line of lines) {
       const trimmed = line.trim();
       
-      // Skip completely empty lines when parsing from storage
-      if (!trimmed && notes.includes('\n')) continue;
+      // Skip empty lines
+      if (!trimmed) continue;
       
       const isIndented = line.startsWith('\t') || line.startsWith('  ');
       
@@ -594,7 +576,7 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
           parentId: isIndented ? lastParentId : undefined
         };
         result.push(lineObj);
-        if (!isIndented) lastParentId = lineObj.id;
+        // Notes should NOT act as parents for child tasks
       } else if (!isIndented) {
         const isCompleted = trimmed.startsWith('✓');
         const content = isCompleted ? trimmed.substring(2).trim() : trimmed;

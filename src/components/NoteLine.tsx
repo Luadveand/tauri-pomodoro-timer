@@ -47,7 +47,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
         // Save current content when outside click occurs
         const trimmed = editContent.trim();
         if (trimmed) {
-          onUpdate(line.id, { content: trimmed });
+          onUpdate(line.id, { content: trimmed, isIndented: editingIsIndented });
         } else {
           onDelete(line.id);
         }
@@ -60,7 +60,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
         document.removeEventListener('outsideClickSave', handleOutsideClickSave as EventListener);
       };
     }
-  }, [isEditing, editContent, line.id, onUpdate, onDelete]);
+  }, [isEditing, editContent, editingIsIndented, line.id, onUpdate, onDelete]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -91,9 +91,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
       // Enhanced Enter behavior for empty child tasks
       if (trimmed === '' && editingIsIndented) {
         // Convert empty child to parent and stay in editing mode
-        // Just remove indentation from display - will be saved when editing ends
-        const unindentedContent = editContent.startsWith('  ') ? editContent.substring(2) : editContent;
-        setEditContent(unindentedContent);
         setEditingIsIndented(false);
         return; // Don't exit editing, don't create new line
       }
@@ -115,19 +112,8 @@ const NoteLine: React.FC<NoteLineProps> = ({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       
-      // Simple Tab cycling: Parent <-> Child - ONLY update display content
-      if (editingIsIndented) {
-        // Child -> Parent: remove indentation from display
-        const unindentedContent = editContent.startsWith('  ') ? editContent.substring(2) : editContent;
-        setEditContent(unindentedContent);
-        setEditingIsIndented(false);
-      } else {
-        // Parent -> Child: add indentation to display
-        const indentedContent = editContent.startsWith('  ') ? editContent : '  ' + editContent;
-        setEditContent(indentedContent);
-        setEditingIsIndented(true);
-      }
-      // NOTE: Actual parent/child status will be determined when editing ends based on content
+      // Simple Tab cycling: Parent <-> Child — only toggle indent state, CSS handles the visual
+      setEditingIsIndented(!editingIsIndented);
     } else if (e.key === 'Escape') {
       onEndEdit();
       setEditContent(line.content);

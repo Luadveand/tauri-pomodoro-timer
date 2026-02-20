@@ -1,6 +1,7 @@
 import React from 'react';
 import { HistoryEntry } from '../types';
 import { useTimerStore } from '../stores/timerStore';
+import { formatTimeFull, getPhaseText, getStatusIcon, getStatusColor } from '../utils/historyHelpers';
 
 interface HistoryDetailModalProps {
   entry: HistoryEntry;
@@ -12,52 +13,6 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
   const { restoreFromHistory } = useTimerStore();
 
   if (!isOpen) return null;
-
-  const formatTime = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getPhaseText = (phase: string, duration: number): string => {
-    const phaseNames = {
-      focus: 'Focus',
-      shortBreak: 'Short Break',
-      longBreak: 'Long Break',
-    };
-    return `${phaseNames[phase as keyof typeof phaseNames]} (${duration} min)`;
-  };
-
-  const getStatusIcon = (status: string): string => {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'skipped':
-        return '⏭';
-      case 'stopped':
-        return '⏹';
-      default:
-        return '○';
-    }
-  };
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'completed':
-        return 'text-soft-green';
-      case 'skipped':
-      case 'stopped':
-        return 'text-gray-text';
-      default:
-        return 'text-off-white';
-    }
-  };
 
   const renderAllNotes = () => {
     if (!entry.notesSnapshot) return <p className="text-gray-text/70 text-sm italic">No notes for this session</p>;
@@ -102,7 +57,7 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
                 </span>
               )}
               <span className={isCompleted ? 'opacity-80' : ''}>
-                {isCompleted && trimmedLine.startsWith('✓') ? line.replace(/✓\s*/, '') : line}
+                {isCompleted ? trimmedLine.replace(/^✓\s*/, '') : trimmedLine}
               </span>
             </div>
           );
@@ -123,7 +78,7 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
             <div>
               <h2 className="text-xl font-medium text-off-white">Session Details</h2>
               <div className="flex items-center gap-2 text-sm text-gray-text mt-1">
-                <span>{formatTime(entry.timestamp)}</span>
+                <span>{formatTimeFull(entry.timestamp)}</span>
                 <span className={`${getStatusColor(entry.status)}`}>
                   {getStatusIcon(entry.status)}
                 </span>

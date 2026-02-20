@@ -8,9 +8,11 @@ import { useTimerStore } from './stores/timerStore';
 import { loadAppData, testStore } from './utils/storage';
 import { initNotifications } from './utils/notifications';
 
+const isTauriApp = () => typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
+
 function MainApp() {
   const { loadSettings, settings } = useSettingsStore();
-  const { loadHistory, loadActiveNotes, parseNotesToLines, setLines } = useTimerStore();
+  const { loadHistory, loadActiveNotes, parseNotesToLines, loadLines } = useTimerStore();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -29,7 +31,7 @@ function MainApp() {
         // Parse existing notes to lines for new line-based UI
         if (appData.activeNotes) {
           const parsedLines = parseNotesToLines(appData.activeNotes);
-          setLines(parsedLines);
+          loadLines(parsedLines);
         }
         
         debugLogger.log(`Loaded ${appData.history.length} history entries and ${appData.activeNotes.length} chars of notes`);
@@ -44,7 +46,15 @@ function MainApp() {
     };
 
     initializeApp();
-  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, setLines]);
+  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, loadLines]);
+
+  // Apply Always On Top setting via Tauri window API
+  useEffect(() => {
+    if (!isTauriApp()) return;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      getCurrentWindow().setAlwaysOnTop(settings.alwaysOnTop).catch(console.error);
+    }).catch(() => { /* not in Tauri context */ });
+  }, [settings.alwaysOnTop]);
 
   return (
     <div className="flex h-screen bg-deep-navy">
