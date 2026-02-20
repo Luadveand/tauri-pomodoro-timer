@@ -268,7 +268,7 @@ const NotesPanel: React.FC = () => {
       </div>
       <div className="px-4 py-2 border-t border-gray-text/10 text-xs text-gray-text/40 font-mono">
         {currentlyEditingId ? (
-          <span>Enter new task · Tab indent · Esc cancel · Ctrl+Space complete</span>
+          <span>Enter new task · Tab indent · Esc cancel · ⌘Enter complete</span>
         ) : lines.length === 0 ? (
           <span>Click anywhere to start adding tasks</span>
         ) : (

@@ -84,29 +84,32 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleToggleComplete();
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       const trimmed = editContent.trim();
-      
+
       // Enhanced Enter behavior for empty child tasks
       if (trimmed === '' && editingIsIndented) {
         // Convert empty child to parent and stay in editing mode
         setEditingIsIndented(false);
         return; // Don't exit editing, don't create new line
       }
-      
+
       // Normal Enter behavior
       if (trimmed) {
         // Preserve the current editing indentation state
-        onUpdate(line.id, { 
+        onUpdate(line.id, {
           content: trimmed,
-          isIndented: editingIsIndented 
+          isIndented: editingIsIndented
         });
       } else {
         onDelete(line.id);
         return;
       }
-      
+
       onEndEdit();
       onNewLine(line.id, editingIsIndented);
     } else if (e.key === 'Tab') {
@@ -131,9 +134,6 @@ const NoteLine: React.FC<NoteLineProps> = ({
         onDelete(line.id);
       }
       // If line has content, allow normal backspace behavior
-    } else if (e.key === ' ' && e.ctrlKey) {
-      e.preventDefault();
-      handleToggleComplete();
     }
   };
 
