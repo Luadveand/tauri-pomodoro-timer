@@ -626,6 +626,10 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
             break;
           }
         }
+        // No parent found above — promote to top-level task
+        if (!newParentId) {
+          return { ...item, isIndented: false, parentId: undefined };
+        }
         return { ...item, parentId: newParentId };
       }
       return item;
