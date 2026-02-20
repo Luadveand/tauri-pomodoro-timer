@@ -179,12 +179,20 @@ const NotesPanel: React.FC = () => {
 
   const { completed, total } = parseTaskCount(lines);
 
-  // Handle clicks in empty areas to create new lines
+  // Handle clicks in empty areas to create new lines or exit editing
   const handlePanelClick = (e: React.MouseEvent) => {
     // Only handle clicks on the panel itself, not on child elements
-    // AND only if we're not currently editing any line
-    if (e.target === e.currentTarget && !currentlyEditingId) {
-      handleNewLine();
+    if (e.target === e.currentTarget) {
+      if (currentlyEditingId) {
+        // Exit editing mode (save via custom event)
+        const saveEvent = new CustomEvent('outsideClickSave', {
+          detail: { lineId: currentlyEditingId }
+        });
+        document.dispatchEvent(saveEvent);
+        setCurrentlyEditingId(null);
+      } else {
+        handleNewLine();
+      }
     }
   };
 
