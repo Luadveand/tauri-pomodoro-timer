@@ -149,7 +149,11 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   const getDisplayContent = () => {
     if (line.type === 'note') {
-      return line.content.startsWith('#') ? line.content : `# ${line.content}`;
+      // Strip the # prefix for display
+      if (line.content.startsWith('#')) {
+        return line.content.substring(1);
+      }
+      return line.content;
     }
     return line.content;
   };
@@ -250,7 +254,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
       <div
         className={`flex-1 text-sm font-mono cursor-text ${
           line.type === 'note'
-            ? 'text-gray-text/80 italic'
+            ? 'text-off-white'
             : isCompleted
               ? 'text-soft-green/90 opacity-80'
               : 'text-off-white'

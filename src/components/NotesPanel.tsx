@@ -91,14 +91,35 @@ const NotesPanel: React.FC = () => {
   }, [currentlyEditingId]);
 
   const handleLineUpdate = (id: string, updates: Partial<LineObject>) => {
+    // Auto-detect line type based on content
+    if (updates.content !== undefined) {
+      const trimmedContent = updates.content.trim();
+      if (trimmedContent.startsWith('#')) {
+        updates.type = 'note';
+        // Normalize note format: remove space after # if present, ensure # prefix exists
+        if (trimmedContent.startsWith('# ')) {
+          updates.content = '#' + trimmedContent.substring(2);
+        } else if (!trimmedContent.startsWith('#')) {
+          updates.content = '#' + trimmedContent;
+        }
+        // Notes cannot be completed and should not have parent relationships
+        updates.completed = false;
+        updates.parentId = undefined;
+        updates.isIndented = false;
+      } else if (updates.type === undefined) {
+        // If content doesn't start with #, ensure it's a task (unless type is explicitly set)
+        updates.type = 'task';
+      }
+    }
+
     // Auto-detect indentation level only if not explicitly provided
-    if (updates.content !== undefined && updates.isIndented === undefined) {
+    if (updates.content !== undefined && updates.isIndented === undefined && updates.type !== 'note') {
       const isContentIndented = updates.content.startsWith('  ');
       updates.isIndented = isContentIndented;
     }
 
     // If becoming a child, assign proper parentId
-    if (updates.isIndented === true && !updates.parentId) {
+    if (updates.isIndented === true && !updates.parentId && updates.type === 'task') {
       const currentStore = useTimerStore.getState();
       const currentLines = currentStore.lines;
       const lineIndex = currentLines.findIndex(line => line.id === id);
