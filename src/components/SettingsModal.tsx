@@ -25,6 +25,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         value = Math.max(0.5, Math.min(60, value));
       } else if (key === 'roundsBeforeLongBreak') {
         value = Math.max(1, Math.min(20, Math.floor(value)));
+      } else if (key === 'leftPanelWidth') {
+        value = Math.max(0.3, Math.min(0.7, value));
       }
     }
 
@@ -53,13 +55,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       
       if (confirmed) {
         await resetSettings();
-        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled });
+        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled, historyPanelVisible: localSettings.historyPanelVisible });
       }
     } catch (error) {
       const confirmed = window.confirm('Are you sure you want to restore all timer settings to their default values? This will not affect your history.');
       if (confirmed) {
         await resetSettings();
-        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled });
+        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled, historyPanelVisible: localSettings.historyPanelVisible });
       }
     }
   };
@@ -279,6 +281,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   }`}
               />
             </button>
+          </div>
+
+          {/* Layout Balance */}
+          <div className="mt-4">
+            <label className="text-sm font-medium text-off-white block mb-2">
+              Layout Balance
+            </label>
+            <div className="space-y-2">
+              <input
+                type="range"
+                min="0.3"
+                max="0.7"
+                step="0.05"
+                value={localSettings.leftPanelWidth}
+                onChange={(e) => handleChange('leftPanelWidth', parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-text/30 rounded-lg appearance-none cursor-pointer slider"
+              />
+              <div className="flex justify-between text-xs text-gray-text">
+                <span>Timer {Math.round(localSettings.leftPanelWidth * 100)}%</span>
+                <span>Notes {Math.round((1 - localSettings.leftPanelWidth) * 100)}%</span>
+              </div>
+            </div>
           </div>
 
           {/* Danger Zone */}

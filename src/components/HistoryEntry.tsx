@@ -42,21 +42,21 @@ const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
   return (
     <>
       <div 
-        className="px-4 py-3 border-b border-gray-text/20 hover:bg-deep-navy/50 transition-colors duration-200 relative group cursor-pointer"
+        className="pl-4 pr-2 py-3 border-b border-gray-text/20 hover:bg-deep-navy/50 transition-colors duration-200 relative group cursor-pointer"
         onClick={() => setIsModalOpen(true)}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-text">
-            <span>{formatTime(entry.timestamp)}</span>
-            <span className={`${getStatusColor(entry.status)}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm text-gray-text min-w-0 flex-1">
+            <span className="flex-shrink-0">{formatTime(entry.timestamp)}</span>
+            <span className={`${getStatusColor(entry.status)} flex-shrink-0`}>
               {getStatusIcon(entry.status)}
             </span>
-            <span className="text-off-white">
+            <span className="text-off-white truncate">
               {getPhaseText(entry.phase, entry.durationMinutes)}
             </span>
             {total > 0 && (
-              <span className="text-gray-text/80">
-                • {completed}/{total} tasks
+              <span className="text-gray-text/80 flex-shrink-0">
+                • {completed}/{total}
               </span>
             )}
           </div>
@@ -81,7 +81,7 @@ const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
                 }
               }
             }}
-            className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-tomato flex-shrink-0"
+            className="text-gray-text text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-tomato flex-shrink-0 ml-2"
             title="Delete entry"
           >
             🗑️

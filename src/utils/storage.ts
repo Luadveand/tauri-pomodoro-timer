@@ -75,6 +75,8 @@ const defaultData: AppData = {
     alwaysOnTop: false,
     debugPanelEnabled: false,
     keepCompletedAcrossPhases: false,
+    historyPanelVisible: true,
+    leftPanelWidth: 0.5,
   },
   history: [],
   activeNotes: '',
@@ -87,8 +89,10 @@ export const loadAppData = async (): Promise<AppData> => {
     const history = await storeInstance.get('history') as HistoryEntry[] | null;
     const activeNotes = await storeInstance.get('activeNotes') as string | null;
 
+    const mergedSettings = { ...defaultData.settings, ...(settings || {}) };
+
     return {
-      settings: settings || defaultData.settings,
+      settings: mergedSettings,
       history: history || defaultData.history,
       activeNotes: activeNotes || defaultData.activeNotes,
     };

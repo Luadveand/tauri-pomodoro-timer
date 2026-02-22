@@ -56,20 +56,25 @@ function MainApp() {
     }).catch(() => { /* not in Tauri context */ });
   }, [settings.alwaysOnTop]);
 
+  const leftWidth = settings.leftPanelWidth;
+  const rightWidth = 1 - leftWidth;
+  
   return (
     <div className="flex h-screen bg-deep-navy">
       {/* Left Side: Timer + History */}
-      <div className="flex-[0.5] flex flex-col border-r border-gray-text/20">
-        <div className="flex-[0.55] border-b border-gray-text/20">
+      <div className="flex flex-col border-r border-gray-text/20" style={{ flex: leftWidth }}>
+        <div className={settings.historyPanelVisible ? "flex-[0.4] border-b border-gray-text/20" : "flex-1"}>
           <TimerPanel />
         </div>
-        <div className="flex-[0.45] min-h-0">
-          <HistoryPanel />
-        </div>
+        {settings.historyPanelVisible && (
+          <div className="flex-[0.6] min-h-0">
+            <HistoryPanel />
+          </div>
+        )}
       </div>
       
       {/* Right Side: Notes & Tasks */}
-      <div className="flex-[0.5] min-h-0">
+      <div className="min-h-0" style={{ flex: rightWidth }}>
         <NotesPanel />
       </div>
       

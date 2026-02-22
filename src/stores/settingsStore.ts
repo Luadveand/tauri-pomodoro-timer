@@ -11,6 +11,8 @@ export interface Settings {
   alwaysOnTop: boolean;
   debugPanelEnabled: boolean;
   keepCompletedAcrossPhases: boolean;
+  historyPanelVisible: boolean;
+  leftPanelWidth: number;
 }
 
 interface SettingsStore {
@@ -30,6 +32,8 @@ export const defaultSettings: Settings = {
   alwaysOnTop: false,
   debugPanelEnabled: false,
   keepCompletedAcrossPhases: false,
+  historyPanelVisible: true,
+  leftPanelWidth: 0.5,
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -44,7 +48,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       // Optionally, you could show a user notification here
     }
   },
-  loadSettings: (settings) => set({ settings }),
+  loadSettings: (settings) => set({ settings: { ...defaultSettings, ...settings } }),
   resetSettings: async () => {
     set({ settings: defaultSettings });
     try {
