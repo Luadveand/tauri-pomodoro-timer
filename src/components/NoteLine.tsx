@@ -189,7 +189,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   if (isEditing) {
     return (
-      <div ref={setNodeRef} style={style} className={`flex items-center gap-2 py-1 px-2 group ${getIndentStyle()}`}>
+      <div ref={setNodeRef} style={style} className={`flex items-start gap-2 py-1 px-2 group ${getIndentStyle()}`}>
         <DragHandle />
         {editingIsIndented && <span className="text-gray-text/40 text-sm">└─</span>}
         {line.type === 'task' && (
@@ -233,7 +233,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
       ref={setNodeRef}
       style={style}
       onClick={handleRowClick}
-      className={`flex items-center gap-2 py-1 px-2 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}
+      className={`flex items-start gap-2 py-1 px-2 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}
     >
       <DragHandle />
       {line.isIndented && <span className="text-gray-text/40 text-sm">└─</span>}
