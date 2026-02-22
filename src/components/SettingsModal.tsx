@@ -283,27 +283,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </button>
           </div>
 
-          {/* Layout Balance */}
-          <div className="mt-4">
-            <label className="text-sm font-medium text-off-white block mb-2">
-              Layout Balance
-            </label>
-            <div className="space-y-2">
-              <input
-                type="range"
-                min="0.3"
-                max="0.7"
-                step="0.05"
-                value={localSettings.leftPanelWidth}
-                onChange={(e) => handleChange('leftPanelWidth', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-text/30 rounded-lg appearance-none cursor-pointer slider"
-              />
-              <div className="flex justify-between text-xs text-gray-text">
-                <span>Timer {Math.round(localSettings.leftPanelWidth * 100)}%</span>
-                <span>Notes {Math.round((1 - localSettings.leftPanelWidth) * 100)}%</span>
-              </div>
-            </div>
-          </div>
 
           {/* Danger Zone */}
           <div className="pt-4 mt-4 border-t border-gray-text/20">
@@ -346,6 +325,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 >
                   Reset App Data
                 </button>
+
+                {/* Layout Balance */}
+                <div className="mt-2">
+                  <label className="text-xs font-medium text-tomato block mb-2">
+                    Layout Balance
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="range"
+                      min="0.3"
+                      max="0.7"
+                      step="0.05"
+                      value={localSettings.leftPanelWidth}
+                      onChange={(e) => handleChange('leftPanelWidth', parseFloat(e.target.value))}
+                      className="w-full h-2 bg-gray-text/30 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <div className="flex justify-between text-xs text-gray-text">
+                      <span>Timer {Math.round(localSettings.leftPanelWidth * 100)}%</span>
+                      <span>Notes {Math.round((1 - localSettings.leftPanelWidth) * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Keep Completed Tasks Toggle */}
                 <div className="flex items-center justify-between">
