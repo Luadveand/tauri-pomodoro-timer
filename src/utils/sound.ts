@@ -1,36 +1,49 @@
+// Reusable AudioContext — avoids leak from creating one per sound play
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+  if (!audioContext || audioContext.state === 'closed') {
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  // Resume if suspended (browser autoplay policy)
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  return audioContext;
+}
+
 // Simple tone generator for notification sound
 export const playNotificationSound = (enabled: boolean) => {
   if (!enabled) return;
 
   try {
-    // Use Web Audio API to generate a simple chime
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
+    const ctx = getAudioContext();
+
     // Create a simple bell-like tone
-    const oscillator1 = audioContext.createOscillator();
-    const oscillator2 = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
+    const oscillator1 = ctx.createOscillator();
+    const oscillator2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
     // Set frequencies for a pleasant chime (major third)
-    oscillator1.frequency.setValueAtTime(800, audioContext.currentTime);
-    oscillator2.frequency.setValueAtTime(1000, audioContext.currentTime);
-    
+    oscillator1.frequency.setValueAtTime(800, ctx.currentTime);
+    oscillator2.frequency.setValueAtTime(1000, ctx.currentTime);
+
     // Connect oscillators to gain
     oscillator1.connect(gainNode);
     oscillator2.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
+    gainNode.connect(ctx.destination);
+
     // Set volume envelope
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-    
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
     // Start and stop the sound
-    oscillator1.start(audioContext.currentTime);
-    oscillator2.start(audioContext.currentTime);
-    oscillator1.stop(audioContext.currentTime + 0.5);
-    oscillator2.stop(audioContext.currentTime + 0.5);
-    
+    oscillator1.start(ctx.currentTime);
+    oscillator2.start(ctx.currentTime);
+    oscillator1.stop(ctx.currentTime + 0.5);
+    oscillator2.stop(ctx.currentTime + 0.5);
+
   } catch (error) {
     console.error('Error playing notification sound:', error);
     // Fallback to system beep if available

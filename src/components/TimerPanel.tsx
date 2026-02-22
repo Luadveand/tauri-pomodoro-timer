@@ -6,12 +6,7 @@ import Controls from './Controls';
 import RoundTracker from './RoundTracker';
 import SettingsModal from './SettingsModal';
 
-interface TimerPanelProps {
-  showHistory: boolean;
-  onToggleHistory: () => void;
-}
-
-const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory }) => {
+const TimerPanel: React.FC = () => {
   const { currentPhase, timeLeft, resetCycle } = useTimerStore();
   const { settings } = useSettingsStore();
   const [showSettings, setShowSettings] = useState(false);
@@ -55,9 +50,8 @@ const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory })
         </button>
       </div>
 
-      {/* Control Buttons */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        {/* Settings Button */}
+      {/* Settings Button */}
+      <div className="absolute top-4 right-4">
         <button
           onClick={() => setShowSettings(true)}
           className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
@@ -65,35 +59,26 @@ const TimerPanel: React.FC<TimerPanelProps> = ({ showHistory, onToggleHistory })
         >
           <span className="text-off-white text-lg">⚙️</span>
         </button>
-        
-        {/* History Toggle Button */}
-        <button
-          onClick={onToggleHistory}
-          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label={showHistory ? "Hide History" : "Show History"}
-        >
-          <span className="text-off-white text-lg">{showHistory ? "📊" : "📈"}</span>
-        </button>
       </div>
 
       {/* Main Timer Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
         {/* Phase Indicator */}
-        <div className="mb-3">
-          <h2 className="text-lg font-medium text-gray-text text-center">
+        <div className="mb-2">
+          <h2 className="text-base font-medium text-gray-text text-center">
             {getPhaseLabel()}
           </h2>
         </div>
 
         {/* Countdown Display */}
-        <div className="mb-4">
-          <div className="timer-font text-6xl font-bold text-white">
+        <div className="mb-3">
+          <div className="timer-font text-4xl font-bold text-white">
             {formatTime(timeLeft)}
           </div>
         </div>
 
         {/* Round Tracker */}
-        <div className="mb-4">
+        <div className="mb-3">
           <RoundTracker />
         </div>
 

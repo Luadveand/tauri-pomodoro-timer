@@ -5,8 +5,8 @@ const RoundTracker: React.FC = () => {
   const { currentRound, totalRounds } = useTimerStore();
 
   const dots = Array.from({ length: totalRounds }, (_, index) => {
-    const isCompleted = index < currentRound;
-    const isCurrent = index + 1 === currentRound;
+    const isCompleted = index < currentRound - 1;
+    const isCurrent = index === currentRound - 1;
     
     return (
       <div

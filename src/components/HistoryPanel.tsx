@@ -49,22 +49,22 @@ const HistoryPanel: React.FC = () => {
   return (
     <div className="h-full bg-lighter-navy flex flex-col">
       {/* Header */}
-      <div className="px-4 py-2 border-b border-gray-text/20">
+      <div className="px-4 py-3 border-b border-gray-text/20">
         <h3 className="text-lg font-medium text-off-white">History</h3>
       </div>
 
       {/* History List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {history.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-text text-sm">No history yet</p>
           </div>
         ) : (
-          <div>
+          <div className="min-h-full">
             {Object.entries(groupedHistory).map(([dateKey, entries]) => (
               <div key={dateKey}>
                 {/* Date Header */}
-                <div className="sticky top-0 bg-accent-surface px-4 py-2 border-b border-gray-text/20">
+                <div className="sticky top-0 bg-accent-surface px-4 py-2 border-b border-gray-text/20 z-10">
                   <h4 className="text-sm font-medium text-off-white">{dateKey}</h4>
                 </div>
                 {/* Entries */}

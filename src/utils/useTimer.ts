@@ -3,20 +3,23 @@ import { useTimerStore } from '../stores/timerStore';
 import { useSettingsStore } from '../stores/settingsStore';
 
 export const useTimer = () => {
-  const { 
-    status, 
-    timeLeft, 
-    setTimeLeft, 
-    completePhase, 
-    initializeTimer 
+  const {
+    status,
+    timeLeft,
+    setTimeLeft,
+    completePhase,
+    initializeTimer
   } = useTimerStore();
   const { settings } = useSettingsStore();
   const intervalRef = useRef<number | null>(null);
 
-  // Initialize timer with current settings
+  // Initialize timer with current settings — only when idle and only for timer-relevant settings
+  const { focusDuration, shortBreakDuration, longBreakDuration, roundsBeforeLongBreak } = settings;
   useEffect(() => {
-    initializeTimer(settings);
-  }, [settings, initializeTimer]);
+    if (status === 'idle') {
+      initializeTimer(settings);
+    }
+  }, [focusDuration, shortBreakDuration, longBreakDuration, roundsBeforeLongBreak, initializeTimer]);
 
   // Timer countdown logic
   useEffect(() => {
