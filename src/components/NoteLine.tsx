@@ -163,10 +163,10 @@ const NoteLine: React.FC<NoteLineProps> = ({
     return line.completed;
   };
 
-  // Drag handle — 6-dot grip icon, visible on hover
+  // Drag handle — 6-dot grip icon, always visible
   const DragHandle = () => (
     <button
-      className="flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-text/0 group-hover:text-gray-text/40 hover:!text-gray-text/70 transition-colors touch-none"
+      className="flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-text/40 hover:text-gray-text/70 transition-colors touch-none"
       {...attributes}
       {...listeners}
       tabIndex={-1}
@@ -185,9 +185,9 @@ const NoteLine: React.FC<NoteLineProps> = ({
 
   if (isEditing) {
     return (
-      <div ref={setNodeRef} style={style} className={`flex items-center gap-2 py-1 px-4 group ${getIndentStyle()}`}>
+      <div ref={setNodeRef} style={style} className={`flex items-center gap-2 py-1 px-2 group ${getIndentStyle()}`}>
         <DragHandle />
-        {editingIsIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
+        {editingIsIndented && <span className="text-gray-text/40 text-sm">└─</span>}
         {line.type === 'task' && (
           <button
             onClick={handleToggleComplete}
@@ -229,10 +229,10 @@ const NoteLine: React.FC<NoteLineProps> = ({
       ref={setNodeRef}
       style={style}
       onClick={handleRowClick}
-      className={`flex items-center gap-2 py-1 px-4 hover:bg-deep-navy/30 transition-colors group cursor-text ${getIndentStyle()}`}
+      className={`flex items-center gap-2 py-1 px-2 hover:bg-deep-navy/30 transition-colors group ${getIndentStyle()}`}
     >
       <DragHandle />
-      {line.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
+      {line.isIndented && <span className="text-gray-text/40 text-sm">└─</span>}
       {line.type === 'task' && (
         <button
           onClick={handleToggleComplete}
@@ -248,7 +248,7 @@ const NoteLine: React.FC<NoteLineProps> = ({
       )}
 
       <div
-        className={`flex-1 text-sm font-mono ${
+        className={`flex-1 text-sm font-mono cursor-text ${
           line.type === 'note'
             ? 'text-gray-text/80 italic'
             : isCompleted

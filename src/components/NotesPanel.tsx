@@ -327,7 +327,7 @@ const NotesPanel: React.FC = () => {
               {activeDragLine ? (
                 <div className="bg-lighter-navy/90 border border-soft-green/30 rounded px-4 py-1 shadow-lg">
                   <div className="flex items-center gap-2">
-                    {activeDragLine.isIndented && <span className="text-gray-text/40 text-sm ml-4">└─</span>}
+                    {activeDragLine.isIndented && <span className="text-gray-text/40 text-sm">└─</span>}
                     {activeDragLine.type === 'task' && (
                       <div className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center flex-shrink-0 ${
                         activeDragLine.completed
