@@ -11,6 +11,7 @@ export interface Settings {
   alwaysOnTop: boolean;
   keepCompletedAcrossPhases: boolean;
   historyPanelVisible: boolean;
+  notesPanelVisible: boolean;
   leftPanelWidth: number;
 }
 
@@ -31,6 +32,7 @@ export const defaultSettings: Settings = {
   alwaysOnTop: false,
   keepCompletedAcrossPhases: false,
   historyPanelVisible: true,
+  notesPanelVisible: true,
   leftPanelWidth: 0.3,
 };
 

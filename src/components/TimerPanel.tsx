@@ -44,6 +44,11 @@ const TimerPanel: React.FC = () => {
     setShowMenu(false);
   };
 
+  const toggleNotesPanel = () => {
+    updateSettings({ notesPanelVisible: !settings.notesPanelVisible });
+    setShowMenu(false);
+  };
+
   // Click outside to close menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -112,6 +117,15 @@ const TimerPanel: React.FC = () => {
               <span className="text-lg">📋</span>
               <span className="text-sm">{settings.historyPanelVisible ? "Hide History" : "Show History"}</span>
             </button>
+            
+            {/* Notes Toggle */}
+            <button
+              onClick={toggleNotesPanel}
+              className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+            >
+              <span className="text-lg">📝</span>
+              <span className="text-sm">{settings.notesPanelVisible ? "Hide Notes" : "Show Notes"}</span>
+            </button>
           </div>
         )}
       </div>
@@ -119,8 +133,10 @@ const TimerPanel: React.FC = () => {
       {/* Main Timer Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-2">
         {/* Phase Indicator */}
-        <div className="mb-2">
-          <h2 className="text-base font-medium text-gray-text text-center">
+        <div className="mb-4">
+          <h2 className={`font-medium text-gray-text text-center transition-all duration-300 ${
+            !settings.notesPanelVisible ? 'text-xl' : 'text-base'
+          }`}>
             {getPhaseLabel()}
           </h2>
         </div>
@@ -131,7 +147,9 @@ const TimerPanel: React.FC = () => {
             <div className="flex flex-col items-center">
               {/* Countdown Display */}
               <div className="mb-3">
-                <div className="timer-font text-5xl font-bold text-white">
+                <div className={`timer-font font-bold text-white transition-all duration-300 ${
+                  !settings.notesPanelVisible ? 'text-7xl' : 'text-5xl'
+                }`}>
                   {formatTime(timeLeft)}
                 </div>
               </div>
@@ -150,14 +168,16 @@ const TimerPanel: React.FC = () => {
           // Full layout with timer and controls stacked vertically
           <>
             {/* Countdown Display */}
-            <div className="mb-3">
-              <div className="timer-font text-6xl font-bold text-white">
+            <div className="mb-6">
+              <div className={`timer-font font-bold text-white transition-all duration-300 ${
+                !settings.notesPanelVisible ? 'text-8xl' : 'text-6xl'
+              }`}>
                 {formatTime(timeLeft)}
               </div>
             </div>
 
             {/* Round Tracker */}
-            <div className="mb-3">
+            <div className="mb-6">
               <RoundTracker />
             </div>
 

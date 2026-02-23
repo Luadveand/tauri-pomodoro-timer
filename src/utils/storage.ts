@@ -75,6 +75,7 @@ const defaultData: AppData = {
     alwaysOnTop: false,
     keepCompletedAcrossPhases: false,
     historyPanelVisible: true,
+    notesPanelVisible: true,
     leftPanelWidth: 0.3,
   },
   history: [],

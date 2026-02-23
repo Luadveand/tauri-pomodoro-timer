@@ -55,13 +55,18 @@ function MainApp() {
     }).catch(() => { /* not in Tauri context */ });
   }, [settings.alwaysOnTop]);
 
-  const leftWidth = settings.leftPanelWidth;
-  const rightWidth = 1 - leftWidth;
+  const leftWidth = settings.notesPanelVisible ? settings.leftPanelWidth : 1;
+  const rightWidth = settings.notesPanelVisible ? (1 - leftWidth) : 0;
   
   return (
     <div className="flex h-screen bg-deep-navy">
       {/* Left Side: Timer + History */}
-      <div className="flex flex-col border-r border-gray-text/20" style={{ flex: leftWidth }}>
+      <div 
+        className={`flex flex-col transition-all duration-500 ease-in-out ${
+          settings.notesPanelVisible ? 'border-r border-gray-text/20' : ''
+        }`} 
+        style={{ flex: leftWidth }}
+      >
         <div className={settings.historyPanelVisible ? "flex-[0.4] border-b border-gray-text/20" : "flex-1"}>
           <TimerPanel />
         </div>
@@ -73,9 +78,14 @@ function MainApp() {
       </div>
       
       {/* Right Side: Notes & Tasks */}
-      <div className="min-h-0" style={{ flex: rightWidth }}>
-        <NotesPanel />
-      </div>
+      {settings.notesPanelVisible && (
+        <div 
+          className="min-h-0 transition-all duration-500 ease-in-out" 
+          style={{ flex: rightWidth }}
+        >
+          <NotesPanel />
+        </div>
+      )}
       
     </div>
   );
