@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
 import NotesPanel from './components/NotesPanel';
@@ -13,6 +13,7 @@ const isTauriApp = () => typeof window !== 'undefined' && (window as any).__TAUR
 function MainApp() {
   const { loadSettings, settings } = useSettingsStore();
   const { loadHistory, loadActiveNotes, parseNotesToLines, loadLines } = useTimerStore();
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -56,6 +57,13 @@ function MainApp() {
     }).catch(() => { /* not in Tauri context */ });
   }, [settings.alwaysOnTop]);
 
+  // Track window width for responsive layout
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Calculate panel layout based on settings mode
   const isInSettingsMode = settings.settingsMode;
   
@@ -64,8 +72,18 @@ function MainApp() {
   
   if (isInSettingsMode) {
     // In settings mode: Settings takes left panel, Timer takes right panel
-    leftWidth = settings.leftPanelWidth;
-    rightWidth = 1 - settings.leftPanelWidth;
+    // Use discrete sizes to avoid animation issues
+    let settingsPixelWidth;
+    if (windowWidth <= 800) {
+      settingsPixelWidth = 400; // Smaller for very small screens
+    } else if (windowWidth <= 1200) {
+      settingsPixelWidth = 500; // Medium size
+    } else {
+      settingsPixelWidth = 600; // Larger for big screens
+    }
+    
+    leftWidth = settingsPixelWidth / windowWidth;
+    rightWidth = 1 - leftWidth;
   } else {
     // Normal mode: Timer+History takes left panel, Notes takes right panel (if visible)
     leftWidth = settings.notesPanelVisible ? settings.leftPanelWidth : 1;
@@ -105,14 +123,12 @@ function MainApp() {
         >
           {isInSettingsMode ? (
             <div className="flex flex-col h-full">
-              <div className={settings.historyPanelVisible ? "flex-[0.4] border-b border-gray-text/20" : "flex-1"}>
+              <div className="flex-[0.4] border-b border-gray-text/20">
                 <TimerPanel />
               </div>
-              {settings.historyPanelVisible && (
-                <div className="flex-[0.6] min-h-0">
-                  <HistoryPanel />
-                </div>
-              )}
+              <div className="flex-[0.6] min-h-0">
+                <HistoryPanel />
+              </div>
             </div>
           ) : (
             <NotesPanel />

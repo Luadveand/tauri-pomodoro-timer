@@ -4,7 +4,7 @@ import { useTimerStore } from '../stores/timerStore';
 import { ask } from '@tauri-apps/plugin-dialog';
 
 const SettingsPanel: React.FC = () => {
-  const { settings, updateSettings, resetSettings } = useSettingsStore();
+  const { settings, updateSettings, resetSettings, exitSettingsMode } = useSettingsStore();
   const { resetAllData, clearHistory } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
@@ -32,16 +32,16 @@ const SettingsPanel: React.FC = () => {
     }));
   };
 
-  const handleSave = () => {
-    updateSettings(localSettings);
+  const handleSave = async () => {
+    await updateSettings(localSettings);
     // Exit settings mode after saving
-    updateSettings({ settingsMode: false });
+    await exitSettingsMode();
   };
 
   const handleCancel = () => {
     setLocalSettings(settings);
     // Exit settings mode without saving
-    updateSettings({ settingsMode: false });
+    exitSettingsMode();
   };
 
   const handleRestoreDefaults = async () => {
@@ -91,15 +91,15 @@ const SettingsPanel: React.FC = () => {
       
       if (confirmed) {
         await resetAllData();
-        resetSettings();
-        updateSettings({ settingsMode: false });
+        await resetSettings();
+        await exitSettingsMode();
       }
     } catch (error) {
       const confirmed = window.confirm('Are you sure you want to factory reset the app? This will permanently delete all your history and reset every setting back to default. This action cannot be undone.');
       if (confirmed) {
         await resetAllData();
-        resetSettings();
-        updateSettings({ settingsMode: false });
+        await resetSettings();
+        await exitSettingsMode();
       }
     }
   };
