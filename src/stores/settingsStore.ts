@@ -13,6 +13,7 @@ export interface Settings {
   historyPanelVisible: boolean;
   notesPanelVisible: boolean;
   leftPanelWidth: number;
+  settingsMode: boolean;
 }
 
 interface SettingsStore {
@@ -34,6 +35,7 @@ export const defaultSettings: Settings = {
   historyPanelVisible: true,
   notesPanelVisible: true,
   leftPanelWidth: 0.3,
+  settingsMode: false,
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({

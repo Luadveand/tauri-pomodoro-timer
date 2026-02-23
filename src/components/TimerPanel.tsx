@@ -4,12 +4,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useTimer } from '../utils/useTimer';
 import Controls from './Controls';
 import RoundTracker from './RoundTracker';
-import SettingsModal from './SettingsModal';
 
 const TimerPanel: React.FC = () => {
   const { currentPhase, timeLeft, resetCycle } = useTimerStore();
   const { settings, updateSettings } = useSettingsStore();
-  const [showSettings, setShowSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
@@ -88,7 +86,7 @@ const TimerPanel: React.FC = () => {
             {/* Settings */}
             <button
               onClick={() => {
-                setShowSettings(true);
+                updateSettings({ settingsMode: !settings.settingsMode });
                 setShowMenu(false);
               }}
               className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
@@ -187,10 +185,6 @@ const TimerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
-      )}
     </div>
   );
 };
