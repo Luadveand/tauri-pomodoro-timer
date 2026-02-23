@@ -308,14 +308,14 @@ const NotesPanel: React.FC = () => {
         onClick={handlePanelClick}
       >
         {lines.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-8">
+          <div 
+            className="flex flex-col items-center justify-center h-full p-8 cursor-pointer"
+            onClick={handleAddFirstLine}
+          >
             <p className="text-gray-text text-sm mb-4">No notes or tasks yet</p>
-            <button
-              onClick={handleAddFirstLine}
-              className="text-soft-green text-sm hover:text-off-white transition-colors"
-            >
-              + Add your first task
-            </button>
+            <span className="text-soft-green text-sm">
+              + Click anywhere to add your first task
+            </span>
           </div>
         ) : (
           <DndContext
@@ -374,7 +374,7 @@ const NotesPanel: React.FC = () => {
         {currentlyEditingId ? (
           <span>Enter new task · Tab indent · Esc cancel · ⌘Enter complete</span>
         ) : lines.length === 0 ? (
-          <span>Click anywhere to start adding tasks</span>
+          <span>Click anywhere to add your first task</span>
         ) : (
           <span>Drag to reorder · Click to edit · Click empty space to add</span>
         )}
