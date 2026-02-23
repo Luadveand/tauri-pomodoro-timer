@@ -68,7 +68,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const handleClearHistory = async () => {
     try {
-      const confirmed = await ask('Are you sure you want to clear all history? This action cannot be undone.', {
+      const confirmed = await ask('Are you sure you want to permanently delete all your session history? This action cannot be undone.', {
         title: 'Clear All History',
         kind: 'warning'
       });
@@ -77,7 +77,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         clearHistory();
       }
     } catch (error) {
-      const confirmed = window.confirm('Are you sure you want to clear all history? This action cannot be undone.');
+      const confirmed = window.confirm('Are you sure you want to permanently delete all your session history? This action cannot be undone.');
       if (confirmed) {
         clearHistory();
       }
@@ -86,8 +86,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const handleResetAppData = async () => {
     try {
-      const confirmed = await ask('Are you sure you want to reset all app data? This will clear your history and reset all settings to default values. This action cannot be undone.', {
-        title: 'Reset App Data',
+      const confirmed = await ask('Are you sure you want to factory reset the app? This will permanently delete all your history and reset every setting back to default. This action cannot be undone.', {
+        title: 'Factory Reset',
         kind: 'warning'
       });
       
@@ -97,7 +97,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         onClose();
       }
     } catch (error) {
-      const confirmed = window.confirm('Are you sure you want to reset all app data? This will clear your history and reset all settings to default values. This action cannot be undone.');
+      const confirmed = window.confirm('Are you sure you want to factory reset the app? This will permanently delete all your history and reset every setting back to default. This action cannot be undone.');
       if (confirmed) {
         await resetAllData();
         resetSettings();
@@ -318,14 +318,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   onClick={handleClearHistory}
                   className="w-full px-3 py-2 border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white rounded-md transition-colors duration-200 text-xs"
                 >
-                  Clear History
+                  Clear All History
                 </button>
                 
                 <button
                   onClick={handleResetAppData}
                   className="w-full px-3 py-2 border border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200 text-xs"
                 >
-                  Reset App Data
+                  Factory Reset
                 </button>
 
                 {/* Layout Balance */}
