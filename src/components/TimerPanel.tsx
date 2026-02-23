@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useTimer } from '../utils/useTimer';
@@ -10,6 +10,8 @@ const TimerPanel: React.FC = () => {
   const { currentPhase, timeLeft, resetCycle } = useTimerStore();
   const { settings, updateSettings } = useSettingsStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   
   // Initialize timer logic
   useTimer();
@@ -39,38 +41,79 @@ const TimerPanel: React.FC = () => {
 
   const toggleHistoryPanel = () => {
     updateSettings({ historyPanelVisible: !settings.historyPanelVisible });
+    setShowMenu(false);
   };
+
+  // Click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="h-full bg-lighter-navy flex flex-col relative">
-      {/* Left Controls */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2">
-        {/* Settings Button */}
+      {/* Menu Button */}
+      <div className="absolute left-4 top-4" ref={menuRef}>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={() => setShowMenu(!showMenu)}
           className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label="Settings"
+          aria-label="Menu"
         >
-          <span className="text-off-white text-lg">⚙️</span>
+          <svg
+            className="w-5 h-5 text-off-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </button>
         
-        {/* Restart Button */}
-        <button
-          onClick={handleRestartCycle}
-          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label="Restart Cycle"
-        >
-          <span className="text-off-white text-lg">🔄</span>
-        </button>
-        
-        {/* History Toggle Button */}
-        <button
-          onClick={toggleHistoryPanel}
-          className={`w-10 h-10 ${settings.historyPanelVisible ? 'bg-accent-surface' : 'bg-accent-surface/50'} hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95`}
-          aria-label={settings.historyPanelVisible ? "Hide History" : "Show History"}
-        >
-          <span className="text-off-white text-lg">📋</span>
-        </button>
+        {/* Dropdown Menu */}
+        {showMenu && (
+          <div className="absolute top-12 left-0 bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl min-w-[160px] py-2 z-50">
+            {/* Settings */}
+            <button
+              onClick={() => {
+                setShowSettings(true);
+                setShowMenu(false);
+              }}
+              className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+            >
+              <span className="text-lg">⚙️</span>
+              <span className="text-sm">Settings</span>
+            </button>
+            
+            {/* Restart */}
+            <button
+              onClick={() => {
+                handleRestartCycle();
+                setShowMenu(false);
+              }}
+              className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+            >
+              <span className="text-lg">🔄</span>
+              <span className="text-sm">Restart Cycle</span>
+            </button>
+            
+            {/* History Toggle */}
+            <button
+              onClick={toggleHistoryPanel}
+              className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+            >
+              <span className="text-lg">📋</span>
+              <span className="text-sm">{settings.historyPanelVisible ? "Hide History" : "Show History"}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Timer Content */}
