@@ -5,7 +5,6 @@ import { playNotificationSound } from '../utils/sound';
 import { sendPhaseNotification } from '../utils/notifications';
 import { saveHistory, clearAllData, saveActiveNotes } from '../utils/storage';
 import { Phase, TimerStatus, HistoryEntry, LineObject } from '../types';
-import { debugLogger } from '../components/DebugPanel';
 
 interface TimerStore {
   currentPhase: Phase;
@@ -160,23 +159,23 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     if (!entryExists) {
       const errorMsg = `Entry not found in current history: ${id}`;
       console.error(errorMsg);
-      debugLogger.log(errorMsg, 'error');
+      console.error(errorMsg);
       return;
     }
     
     const entryToDelete = currentHistory.find(e => e.id === id);
-    debugLogger.log(`Deleting history entry: ${entryToDelete?.phase} (${entryToDelete?.status}) from ${new Date(entryToDelete?.timestamp || '').toLocaleTimeString()}`);
+    console.log(`Deleting history entry: ${entryToDelete?.phase} (${entryToDelete?.status}) from ${new Date(entryToDelete?.timestamp || '').toLocaleTimeString()}`);
     
     const newHistory = currentHistory.filter((entry) => entry.id !== id);
     set({ history: newHistory });
     
     try {
       await saveHistory(newHistory);
-      debugLogger.log('History entry deleted successfully');
+      console.log('History entry deleted successfully');
     } catch (error) {
       const errorMsg = `Failed to save history after deletion: ${error}`;
       console.error(errorMsg);
-      debugLogger.log(errorMsg, 'error');
+      console.error(errorMsg);
     }
   },
 

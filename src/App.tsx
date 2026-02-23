@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import TimerPanel from './components/TimerPanel';
 import HistoryPanel from './components/HistoryPanel';
 import NotesPanel from './components/NotesPanel';
-import DebugPanel, { debugLogger } from './components/DebugPanel';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
 import { loadAppData, testStore } from './utils/storage';
@@ -17,10 +16,10 @@ function MainApp() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        debugLogger.log('App initializing...');
+        console.log('App initializing...');
         // Test store functionality first
         await testStore();
-        debugLogger.log('Store test completed');
+        console.log('Store test completed');
         
         // Load persisted data
         const appData = await loadAppData();
@@ -34,14 +33,14 @@ function MainApp() {
           loadLines(parsedLines);
         }
         
-        debugLogger.log(`Loaded ${appData.history.length} history entries and ${appData.activeNotes.length} chars of notes`);
+        console.log(`Loaded ${appData.history.length} history entries and ${appData.activeNotes.length} chars of notes`);
         
         // Initialize notifications
         await initNotifications();
-        debugLogger.log('App initialization complete');
+        console.log('App initialization complete');
       } catch (error) {
         console.error('Error initializing app:', error);
-        debugLogger.log('Error initializing app: ' + error, 'error');
+        console.error('Error initializing app:', error);
       }
     };
 
@@ -78,7 +77,6 @@ function MainApp() {
         <NotesPanel />
       </div>
       
-      {settings.debugPanelEnabled && <DebugPanel />}
     </div>
   );
 }

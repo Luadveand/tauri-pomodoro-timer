@@ -55,13 +55,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       
       if (confirmed) {
         await resetSettings();
-        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled, historyPanelVisible: localSettings.historyPanelVisible });
+        setLocalSettings({ ...defaultSettings, historyPanelVisible: localSettings.historyPanelVisible });
       }
     } catch (error) {
       const confirmed = window.confirm('Are you sure you want to restore all timer settings to their default values? This will not affect your history.');
       if (confirmed) {
         await resetSettings();
-        setLocalSettings({ ...defaultSettings, debugPanelEnabled: localSettings.debugPanelEnabled, historyPanelVisible: localSettings.historyPanelVisible });
+        setLocalSettings({ ...defaultSettings, historyPanelVisible: localSettings.historyPanelVisible });
       }
     }
   };
@@ -105,6 +105,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       }
     }
   };
+
+
 
 
   return (
@@ -365,22 +367,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   </button>
                 </div>
 
-                {/* Debug Panel Toggle */}
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-blue-400">
-                    Debug Panel
-                  </label>
-                  <button
-                    onClick={() => handleChange('debugPanelEnabled', !localSettings.debugPanelEnabled)}
-                    className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.debugPanelEnabled ? 'bg-blue-500' : 'bg-gray-text/30'
-                      }`}
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.debugPanelEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
-                    />
-                  </button>
-                </div>
               </div>
             )}
           </div>

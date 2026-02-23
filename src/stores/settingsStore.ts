@@ -9,7 +9,6 @@ export interface Settings {
   soundEnabled: boolean;
   notificationsEnabled: boolean;
   alwaysOnTop: boolean;
-  debugPanelEnabled: boolean;
   keepCompletedAcrossPhases: boolean;
   historyPanelVisible: boolean;
   leftPanelWidth: number;
@@ -30,10 +29,9 @@ export const defaultSettings: Settings = {
   soundEnabled: true,
   notificationsEnabled: true,
   alwaysOnTop: false,
-  debugPanelEnabled: false,
   keepCompletedAcrossPhases: false,
   historyPanelVisible: true,
-  leftPanelWidth: 0.5,
+  leftPanelWidth: 0.3,
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
