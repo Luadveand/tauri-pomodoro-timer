@@ -5,14 +5,15 @@ import NotesPanel from './components/NotesPanel';
 import SettingsPanel from './components/SettingsPanel';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
-import { loadAppData, testStore } from './utils/storage';
+import { loadAppData, testStore, saveSettings } from './utils/storage';
 import { initNotifications } from './utils/notifications';
+import { useSettingsStore as getSettingsStore } from './stores/settingsStore';
 
 const isTauriApp = () => typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
 
 function MainApp() {
   const { loadSettings, settings } = useSettingsStore();
-  const { loadHistory, loadActiveNotes, parseNotesToLines, loadLines } = useTimerStore();
+  const { loadHistory, loadActiveNotes, parseNotesToLines, loadLines, loadNotebookPages, mergeAllPagesIntoOne } = useTimerStore();
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -28,13 +29,62 @@ function MainApp() {
         loadSettings(appData.settings);
         loadHistory(appData.history);
         loadActiveNotes(appData.activeNotes);
-        
-        // Parse existing notes to lines for new line-based UI
-        if (appData.activeNotes) {
-          const parsedLines = parseNotesToLines(appData.activeNotes);
-          loadLines(parsedLines);
+
+        // Handle notebook pages initialization / grace period
+        const loadedSettings = appData.settings;
+        if (loadedSettings.notebookPagesEnabled && appData.notebookPages.length > 0) {
+          // Feature is ON and pages exist: hydrate lines for each page
+          const hydratedPages = appData.notebookPages.map(p => ({
+            ...p,
+            lines: parseNotesToLines(p.notes),
+          }));
+          loadNotebookPages(hydratedPages, appData.activePageId);
+        } else if (!loadedSettings.notebookPagesEnabled && appData.notebookPages.length > 0) {
+          // Feature is OFF but pages exist: grace period handling
+          if (!loadedSettings.notebookPagesGracePeriodStart) {
+            // Just deactivated — start grace period
+            const updatedGraceSettings = { ...loadedSettings, notebookPagesGracePeriodStart: new Date().toISOString() };
+            getSettingsStore.getState().loadSettings(updatedGraceSettings);
+            saveSettings(updatedGraceSettings).catch(console.error);
+            // Load pages in read-only mode
+            const hydratedPages = appData.notebookPages.map(p => ({
+              ...p,
+              lines: parseNotesToLines(p.notes),
+            }));
+            loadNotebookPages(hydratedPages, appData.activePageId);
+          } else {
+            const gracePeriodStart = new Date(loadedSettings.notebookPagesGracePeriodStart).getTime();
+            const now = Date.now();
+            const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+            if (now - gracePeriodStart > fourteenDays) {
+              // Grace period expired — auto-merge
+              const hydratedPages = appData.notebookPages.map(p => ({
+                ...p,
+                lines: parseNotesToLines(p.notes),
+              }));
+              loadNotebookPages(hydratedPages, appData.activePageId);
+              // mergeAllPagesIntoOne will clear pages and grace period
+              await mergeAllPagesIntoOne();
+              const clearedSettings = { ...loadedSettings, notebookPagesGracePeriodStart: null };
+              getSettingsStore.getState().loadSettings(clearedSettings);
+              await saveSettings(clearedSettings);
+            } else {
+              // Still in grace period — load pages in read-only mode
+              const hydratedPages = appData.notebookPages.map(p => ({
+                ...p,
+                lines: parseNotesToLines(p.notes),
+              }));
+              loadNotebookPages(hydratedPages, appData.activePageId);
+            }
+          }
+        } else {
+          // Normal case: no pages, parse existing notes
+          if (appData.activeNotes) {
+            const parsedLines = parseNotesToLines(appData.activeNotes);
+            loadLines(parsedLines);
+          }
         }
-        
+
         console.log(`Loaded ${appData.history.length} history entries and ${appData.activeNotes.length} chars of notes`);
         
         // Initialize notifications
@@ -47,7 +97,7 @@ function MainApp() {
     };
 
     initializeApp();
-  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, loadLines]);
+  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, loadLines, loadNotebookPages, mergeAllPagesIntoOne]);
 
   // Apply Always On Top setting via Tauri window API
   useEffect(() => {

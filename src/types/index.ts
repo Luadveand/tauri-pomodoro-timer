@@ -8,6 +8,7 @@ export interface HistoryEntry {
     durationMinutes: number;
     status: 'completed' | 'skipped' | 'stopped';
     notesSnapshot?: string;
+    pagesSnapshot?: NotebookPagesSnapshot;
 }
 
 export interface LineObject {
@@ -17,4 +18,16 @@ export interface LineObject {
     completed: boolean;
     isIndented?: boolean;
     parentId?: string;
+}
+
+export interface NotebookPage {
+    id: string;
+    name: string;
+    notes: string;
+    lines: LineObject[];
+}
+
+export interface NotebookPagesSnapshot {
+    pages: Array<{ id: string; name: string; notes: string }>;
+    activePageId: string;
 }

@@ -10,6 +10,8 @@ export interface Settings {
   notificationsEnabled: boolean;
   alwaysOnTop: boolean;
   keepCompletedAcrossPhases: boolean;
+  notebookPagesEnabled: boolean;
+  notebookPagesGracePeriodStart: string | null;
   historyPanelVisible: boolean;
   notesPanelVisible: boolean;
   leftPanelWidth: number;
@@ -41,6 +43,8 @@ export const defaultSettings: Settings = {
   notificationsEnabled: true,
   alwaysOnTop: false,
   keepCompletedAcrossPhases: false,
+  notebookPagesEnabled: false,
+  notebookPagesGracePeriodStart: null,
   historyPanelVisible: true,
   notesPanelVisible: true,
   leftPanelWidth: 0.8,

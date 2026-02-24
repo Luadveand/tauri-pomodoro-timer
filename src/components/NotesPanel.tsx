@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTimerStore } from '../stores/timerStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { LineObject } from '../types';
 import NoteLine from './NoteLine';
+import PageTabBar from './PageTabBar';
 import { v4 as uuidv4 } from 'uuid';
 import {
   DndContext,
@@ -31,12 +33,55 @@ const NotesPanel: React.FC = () => {
     updateLine,
     deleteLine,
     reorderLines,
+    notebookPages,
+    activePageId,
+    switchPage,
+    addPage,
+    deletePage: deletePageStore,
+    renamePage,
+    reorderPages,
   } = useTimerStore();
+  const { settings } = useSettingsStore();
 
   const [newLineIds, setNewLineIds] = React.useState<Set<string>>(new Set());
   const [currentlyEditingId, setCurrentlyEditingId] = React.useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Notebook pages: determine read-only mode (grace period)
+  const pagesEnabled = settings.notebookPagesEnabled;
+  const showPageTabs = notebookPages.length > 0;
+  const pagesReadOnly = !pagesEnabled && notebookPages.length > 0;
+
+  // Keyboard shortcuts for page switching (Cmd/Ctrl+Tab)
+  useEffect(() => {
+    if (!showPageTabs || !activePageId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle when not editing text
+      if (currentlyEditingId) return;
+
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (isMeta && e.key === 'Tab') {
+        e.preventDefault();
+        const currentIndex = notebookPages.findIndex(p => p.id === activePageId);
+        if (currentIndex === -1) return;
+
+        let nextIndex: number;
+        if (e.shiftKey) {
+          // Previous page (wrap)
+          nextIndex = currentIndex === 0 ? notebookPages.length - 1 : currentIndex - 1;
+        } else {
+          // Next page (wrap)
+          nextIndex = currentIndex === notebookPages.length - 1 ? 0 : currentIndex + 1;
+        }
+        switchPage(notebookPages[nextIndex].id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPageTabs, activePageId, notebookPages, currentlyEditingId, switchPage]);
 
   // Configure pointer sensor with activation distance to distinguish clicks from drags
   const sensors = useSensors(
@@ -290,8 +335,28 @@ const NotesPanel: React.FC = () => {
     setCurrentlyEditingId(null);
   };
 
+  const handleDeletePage = async (pageId: string) => {
+    if (notebookPages.length <= 1) return;
+    const confirmed = window.confirm('Are you sure you want to delete this page? This action cannot be undone.');
+    if (confirmed) {
+      await deletePageStore(pageId);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-deep-navy" ref={panelRef}>
+      {showPageTabs && (
+        <PageTabBar
+          pages={notebookPages}
+          activePageId={activePageId}
+          onSwitchPage={switchPage}
+          onAddPage={() => addPage()}
+          onDeletePage={handleDeletePage}
+          onRenamePage={renamePage}
+          onReorderPages={reorderPages}
+          readOnly={pagesReadOnly}
+        />
+      )}
       <div className="px-4 py-3 border-b border-gray-text/20">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold text-off-white">Notes & Tasks</h3>

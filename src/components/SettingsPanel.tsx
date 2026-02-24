@@ -5,7 +5,7 @@ import { ask } from '@tauri-apps/plugin-dialog';
 
 const SettingsPanel: React.FC = () => {
   const { settings, updateSettings, resetSettings, exitSettingsMode } = useSettingsStore();
-  const { resetAllData, clearHistory } = useTimerStore();
+  const { resetAllData, clearHistory, initializeNotebookPages, teardownNotebookPages } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
 
@@ -33,7 +33,40 @@ const SettingsPanel: React.FC = () => {
   };
 
   const handleSave = async () => {
-    await updateSettings(localSettings);
+    const prevEnabled = settings.notebookPagesEnabled;
+    const newEnabled = localSettings.notebookPagesEnabled;
+
+    // Handle notebook pages toggle change
+    if (!prevEnabled && newEnabled) {
+      // OFF -> ON: initialize pages, clear grace period
+      const updatedLocal = { ...localSettings, notebookPagesGracePeriodStart: null };
+      await updateSettings(updatedLocal);
+      await initializeNotebookPages();
+    } else if (prevEnabled && !newEnabled) {
+      // ON -> OFF: confirm and teardown
+      let confirmed = false;
+      try {
+        confirmed = await ask(
+          'Only the currently active page will be kept. All other pages will be permanently deleted.',
+          { title: 'Disable Notebook Pages', kind: 'warning' }
+        );
+      } catch {
+        confirmed = window.confirm(
+          'Only the currently active page will be kept. All other pages will be permanently deleted.'
+        );
+      }
+      if (!confirmed) {
+        // User cancelled — revert the toggle and don't save
+        setLocalSettings(prev => ({ ...prev, notebookPagesEnabled: true }));
+        return;
+      }
+      const updatedLocal = { ...localSettings, notebookPagesGracePeriodStart: null };
+      await updateSettings(updatedLocal);
+      await teardownNotebookPages();
+    } else {
+      await updateSettings(localSettings);
+    }
+
     // Exit settings mode after saving
     await exitSettingsMode();
   };
@@ -389,6 +422,26 @@ const SettingsPanel: React.FC = () => {
                 >
                   <div
                     className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.keepCompletedAcrossPhases ? 'translate-x-6' : 'translate-x-0.5'
+                      }`}
+                  />
+                </button>
+              </div>
+
+              {/* Notebook Pages Toggle */}
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <label className="text-sm font-medium text-off-white block">
+                    Notebook Pages
+                  </label>
+                  <p className="text-xs text-gray-text mt-0.5">Organize notes into multiple tabbed pages</p>
+                </div>
+                <button
+                  onClick={() => handleChange('notebookPagesEnabled', !localSettings.notebookPagesEnabled)}
+                  className={`w-12 h-6 rounded-full transition-colors duration-200 relative ${localSettings.notebookPagesEnabled ? 'bg-tomato' : 'bg-gray-text/30'
+                    }`}
+                >
+                  <div
+                    className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform duration-200 ${localSettings.notebookPagesEnabled ? 'translate-x-6' : 'translate-x-0.5'
                       }`}
                   />
                 </button>

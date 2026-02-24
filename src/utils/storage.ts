@@ -62,6 +62,8 @@ export interface AppData {
   settings: Settings;
   history: HistoryEntry[];
   activeNotes: string;
+  notebookPages: Array<{ id: string; name: string; notes: string }>;
+  activePageId: string | null;
 }
 
 const defaultData: AppData = {
@@ -74,12 +76,17 @@ const defaultData: AppData = {
     notificationsEnabled: true,
     alwaysOnTop: false,
     keepCompletedAcrossPhases: false,
+    notebookPagesEnabled: false,
+    notebookPagesGracePeriodStart: null,
     historyPanelVisible: true,
     notesPanelVisible: true,
     leftPanelWidth: 0.3,
+    settingsMode: false,
   },
   history: [],
   activeNotes: '',
+  notebookPages: [],
+  activePageId: null,
 };
 
 export const loadAppData = async (): Promise<AppData> => {
@@ -88,6 +95,8 @@ export const loadAppData = async (): Promise<AppData> => {
     const settings = await storeInstance.get('settings') as Settings | null;
     const history = await storeInstance.get('history') as HistoryEntry[] | null;
     const activeNotes = await storeInstance.get('activeNotes') as string | null;
+    const notebookPages = await storeInstance.get('notebookPages') as Array<{ id: string; name: string; notes: string }> | null;
+    const activePageId = await storeInstance.get('activePageId') as string | null;
 
     const mergedSettings = { ...defaultData.settings, ...(settings || {}) };
 
@@ -95,6 +104,8 @@ export const loadAppData = async (): Promise<AppData> => {
       settings: mergedSettings,
       history: history || defaultData.history,
       activeNotes: activeNotes || defaultData.activeNotes,
+      notebookPages: notebookPages || defaultData.notebookPages,
+      activePageId: activePageId || defaultData.activePageId,
     };
   } catch (error) {
     console.error('Error loading app data:', error);
@@ -131,6 +142,28 @@ export const saveActiveNotes = async (activeNotes: string): Promise<void> => {
     await storeInstance.save();
   } catch (error) {
     console.error('[Storage] Error saving active notes:', error);
+    throw error;
+  }
+};
+
+export const saveNotebookPages = async (pages: Array<{ id: string; name: string; notes: string }>): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.set('notebookPages', pages);
+    await storeInstance.save();
+  } catch (error) {
+    console.error('[Storage] Error saving notebook pages:', error);
+    throw error;
+  }
+};
+
+export const saveActivePageId = async (pageId: string | null): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.set('activePageId', pageId);
+    await storeInstance.save();
+  } catch (error) {
+    console.error('[Storage] Error saving active page ID:', error);
     throw error;
   }
 };

@@ -12,31 +12,45 @@ interface HistoryEntryProps {
 const HistoryEntry: React.FC<HistoryEntryProps> = ({ entry, onDelete }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const parseTaskCount = (notes: string): { completed: number; total: number } => {
+  const parseTaskCountFromString = (notes: string): { completed: number; total: number } => {
     if (!notes) return { completed: 0, total: 0 };
-    
+
     const lines = notes.split('\n');
     let completed = 0;
     let total = 0;
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim();
       // Skip empty lines, notes (starting with #), and indented lines (children)
       if (!trimmedLine || trimmedLine.startsWith('#') || line.startsWith('\t') || line.startsWith('  ')) {
         continue;
       }
-      
+
       total++;
       if (trimmedLine.startsWith('✓')) {
         completed++;
       }
     }
-    
+
     return { completed, total };
   };
 
+  const getTaskCount = (): { completed: number; total: number } => {
+    if (entry.pagesSnapshot && entry.pagesSnapshot.pages.length > 0) {
+      // Aggregate task counts across ALL pages
+      let completed = 0;
+      let total = 0;
+      for (const page of entry.pagesSnapshot.pages) {
+        const counts = parseTaskCountFromString(page.notes);
+        completed += counts.completed;
+        total += counts.total;
+      }
+      return { completed, total };
+    }
+    return parseTaskCountFromString(entry.notesSnapshot || '');
+  };
 
-  const { completed, total } = parseTaskCount(entry.notesSnapshot || '');
+  const { completed, total } = getTaskCount();
 
 
   return (
