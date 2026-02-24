@@ -8,6 +8,7 @@ import { useTimerStore } from './stores/timerStore';
 import { loadAppData, testStore, saveSettings } from './utils/storage';
 import { initNotifications } from './utils/notifications';
 import { useSettingsStore as getSettingsStore } from './stores/settingsStore';
+import { usePremiumStore } from './stores/premiumStore';
 
 const isTauriApp = () => typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
 
@@ -82,6 +83,24 @@ function MainApp() {
           if (appData.activeNotes) {
             const parsedLines = parseNotesToLines(appData.activeNotes);
             loadLines(parsedLines);
+          }
+        }
+
+        // --- Premium state ---
+        const { loadPremiumState, revalidate, checkGracePeriod } = usePremiumStore.getState();
+        loadPremiumState(appData.premium);
+
+        if (appData.premium.isActive && appData.premium.lastValidated) {
+          const daysSinceValidation =
+            (Date.now() - new Date(appData.premium.lastValidated).getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceValidation > 7) {
+            revalidate().then(() => {
+              const { isActive } = usePremiumStore.getState();
+              if (!isActive) checkGracePeriod();
+            });
+          }
+          if (daysSinceValidation > 30) {
+            checkGracePeriod();
           }
         }
 

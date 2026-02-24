@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSettingsStore, Settings, defaultSettings } from '../stores/settingsStore';
 import { useTimerStore } from '../stores/timerStore';
+import { usePremiumStore } from '../stores/premiumStore';
 import { ask } from '@tauri-apps/plugin-dialog';
 
 const SettingsPanel: React.FC = () => {
@@ -8,6 +9,14 @@ const SettingsPanel: React.FC = () => {
   const { resetAllData, clearHistory, initializeNotebookPages, teardownNotebookPages } = useTimerStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+
+  const isPremium = usePremiumStore(s => s.isActive);
+  const isValidating = usePremiumStore(s => s.isValidating);
+  const validationError = usePremiumStore(s => s.validationError);
+  const customerEmail = usePremiumStore(s => s.customerEmail);
+  const activatePremium = usePremiumStore(s => s.activate);
+  const deactivatePremium = usePremiumStore(s => s.deactivate);
 
   const handleChange = (key: keyof Settings, value: number | boolean) => {
     // Validate numeric inputs to ensure min/max per PRD ranges
@@ -388,6 +397,74 @@ const SettingsPanel: React.FC = () => {
           
           {isDangerZoneOpen && (
             <div className="space-y-6 mt-4">
+              {/* License Key Section (always enabled) */}
+              {!isPremium ? (
+                <div className="space-y-3 mb-6 pb-6 border-b border-gray-text/10">
+                  <label className="text-sm font-medium text-off-white block">License Key</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={licenseKeyInput}
+                      onChange={(e) => setLicenseKeyInput(e.target.value)}
+                      placeholder="POMO-xxxx-xxxx-xxxx-xxxx"
+                      className="flex-1 bg-gray-text/10 border border-gray-text/20 rounded-lg px-3 py-2 text-sm text-off-white placeholder-gray-text/50 focus:outline-none focus:border-tomato/50"
+                      disabled={isValidating}
+                    />
+                    <button
+                      onClick={() => activatePremium(licenseKeyInput)}
+                      disabled={isValidating || !licenseKeyInput.trim()}
+                      className="px-4 py-2 bg-tomato text-white rounded-lg text-sm font-medium hover:bg-tomato/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isValidating ? 'Validating...' : 'Activate'}
+                    </button>
+                  </div>
+                  {validationError && (
+                    <p className="text-xs text-red-400">{validationError}</p>
+                  )}
+                  <a
+                    href="https://polar.sh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-tomato/70 hover:text-tomato underline"
+                  >
+                    Get a license key
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-2 mb-6 pb-6 border-b border-gray-text/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                      <span className="text-sm text-off-white">Premium active</span>
+                      {customerEmail && (
+                        <span className="text-xs text-gray-text">({customerEmail})</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        let confirmed = false;
+                        try {
+                          confirmed = await ask(
+                            'Are you sure? This will deactivate premium on this device.',
+                            { title: 'Deactivate Premium', kind: 'warning' }
+                          );
+                        } catch {
+                          confirmed = window.confirm(
+                            'Are you sure? This will deactivate premium on this device.'
+                          );
+                        }
+                        if (confirmed) await deactivatePremium();
+                      }}
+                      className="text-xs text-gray-text hover:text-red-400 transition-colors"
+                    >
+                      Deactivate
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Premium-gated options */}
+              <div className={!isPremium ? 'opacity-40 pointer-events-none select-none' : ''}>
               {/* Layout Balance */}
               <div>
                 <label className="text-sm font-medium text-off-white block mb-3">
@@ -487,6 +564,7 @@ const SettingsPanel: React.FC = () => {
                   </button>
                 </div>
               </div>
+              </div>{/* end premium-gated options */}
             </div>
           )}
         </div>

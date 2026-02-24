@@ -1,5 +1,5 @@
 import { Settings } from '../stores/settingsStore';
-import { HistoryEntry } from '../types';
+import { HistoryEntry, PremiumData } from '../types';
 
 let store: any = null;
 
@@ -64,6 +64,7 @@ export interface AppData {
   activeNotes: string;
   notebookPages: Array<{ id: string; name: string; notes: string }>;
   activePageId: string | null;
+  premium: PremiumData;
 }
 
 const defaultData: AppData = {
@@ -87,6 +88,15 @@ const defaultData: AppData = {
   activeNotes: '',
   notebookPages: [],
   activePageId: null,
+  premium: {
+    licenseKey: null,
+    isActive: false,
+    activatedAt: null,
+    lastValidated: null,
+    customerEmail: null,
+    activationId: null,
+    deviceId: null,
+  },
 };
 
 export const loadAppData = async (): Promise<AppData> => {
@@ -97,6 +107,7 @@ export const loadAppData = async (): Promise<AppData> => {
     const activeNotes = await storeInstance.get('activeNotes') as string | null;
     const notebookPages = await storeInstance.get('notebookPages') as Array<{ id: string; name: string; notes: string }> | null;
     const activePageId = await storeInstance.get('activePageId') as string | null;
+    const premium = await storeInstance.get('premium') as PremiumData | null;
 
     const mergedSettings = { ...defaultData.settings, ...(settings || {}) };
 
@@ -106,6 +117,7 @@ export const loadAppData = async (): Promise<AppData> => {
       activeNotes: activeNotes || defaultData.activeNotes,
       notebookPages: notebookPages || defaultData.notebookPages,
       activePageId: activePageId || defaultData.activePageId,
+      premium: { ...defaultData.premium, ...(premium || {}) },
     };
   } catch (error) {
     console.error('Error loading app data:', error);
@@ -164,6 +176,17 @@ export const saveActivePageId = async (pageId: string | null): Promise<void> => 
     await storeInstance.save();
   } catch (error) {
     console.error('[Storage] Error saving active page ID:', error);
+    throw error;
+  }
+};
+
+export const savePremiumState = async (premium: PremiumData): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.set('premium', premium);
+    await storeInstance.save();
+  } catch (error) {
+    console.error('[Storage] Error saving premium state:', error);
     throw error;
   }
 };

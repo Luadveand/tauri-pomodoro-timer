@@ -31,3 +31,13 @@ export interface NotebookPagesSnapshot {
     pages: Array<{ id: string; name: string; notes: string }>;
     activePageId: string;
 }
+
+export interface PremiumData {
+    licenseKey: string | null;
+    isActive: boolean;
+    activatedAt: string | null;
+    lastValidated: string | null;
+    customerEmail: string | null;
+    activationId: string | null;
+    deviceId: string | null;
+}
