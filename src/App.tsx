@@ -5,15 +5,18 @@ import NotesPanel from './components/NotesPanel';
 import SettingsPanel from './components/SettingsPanel';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTimerStore } from './stores/timerStore';
+import { useThemeStore } from './stores/themeStore';
 import { loadAppData, testStore, saveSettings } from './utils/storage';
 import { initNotifications } from './utils/notifications';
 import { useSettingsStore as getSettingsStore } from './stores/settingsStore';
+import { applyTheme, resolveTheme } from './themes';
 
 const isTauriApp = () => typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
 
 function MainApp() {
   const { loadSettings, settings } = useSettingsStore();
   const { loadHistory, loadActiveNotes, parseNotesToLines, loadLines, loadNotebookPages, mergeAllPagesIntoOne } = useTimerStore();
+  const { customThemes, loadCustomThemes } = useThemeStore();
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -27,6 +30,7 @@ function MainApp() {
         // Load persisted data
         const appData = await loadAppData();
         loadSettings(appData.settings);
+        loadCustomThemes(appData.customThemes);
         loadHistory(appData.history);
         loadActiveNotes(appData.activeNotes);
 
@@ -97,7 +101,7 @@ function MainApp() {
     };
 
     initializeApp();
-  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, loadLines, loadNotebookPages, mergeAllPagesIntoOne]);
+  }, [loadSettings, loadHistory, loadActiveNotes, parseNotesToLines, loadLines, loadNotebookPages, mergeAllPagesIntoOne, loadCustomThemes]);
 
   // Apply Always On Top setting via Tauri window API
   useEffect(() => {
@@ -109,19 +113,23 @@ function MainApp() {
 
   // Apply theme to DOM
   useEffect(() => {
-    const applyTheme = (theme: 'light' | 'dark') => {
-      document.documentElement.setAttribute('data-theme', theme);
+    const apply = (id: string) => {
+      const theme = resolveTheme(id, customThemes);
+      applyTheme(theme ?? resolveTheme('dark', [])!);
     };
-    if (settings.theme === 'system') {
+
+    if (settings.useSystemTheme) {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = (e: MediaQueryListEvent | MediaQueryList) => applyTheme(e.matches ? 'dark' : 'light');
+      const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+        apply(e.matches ? settings.systemThemeDark : settings.systemThemeLight);
+      };
       handler(mq);
       mq.addEventListener('change', handler as (e: MediaQueryListEvent) => void);
       return () => mq.removeEventListener('change', handler as (e: MediaQueryListEvent) => void);
     } else {
-      applyTheme(settings.theme);
+      apply(settings.themeId);
     }
-  }, [settings.theme]);
+  }, [settings.themeId, settings.useSystemTheme, settings.systemThemeLight, settings.systemThemeDark, customThemes]);
 
   // Track window width for responsive layout
   useEffect(() => {

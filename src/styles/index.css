@@ -20,20 +20,6 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
 }
 
-[data-theme="light"] {
-  --color-deep-navy: 248 249 251;
-  --color-lighter-navy: 255 255 255;
-  --color-accent-surface: 232 236 241;
-  --color-tomato: 220 53 69;
-  --color-off-white: 26 26 46;
-  --color-gray-text: 107 114 128;
-  --color-soft-green: 5 150 105;
-  --slider-thumb-bg: #dc3545;
-  --slider-thumb-border: #e8ecf1;
-  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
-}
-
 * {
   box-sizing: border-box;
 }

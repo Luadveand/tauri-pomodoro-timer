@@ -1,16 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSettingsStore, Settings, defaultSettings } from '../stores/settingsStore';
 import { useTimerStore } from '../stores/timerStore';
+import { useThemeStore } from '../stores/themeStore';
 import { ask } from '@tauri-apps/plugin-dialog';
+import {
+  presetThemes,
+  applyTheme,
+  exportTheme,
+  validateImportData,
+  importTheme,
+  ThemeDefinition,
+} from '../themes';
+import ThemeEditor from './ThemeEditor';
 
 const SettingsPanel: React.FC = () => {
   const { settings, updateSettings, resetSettings, exitSettingsMode } = useSettingsStore();
   const { resetAllData, clearHistory, initializeNotebookPages, teardownNotebookPages } = useTimerStore();
+  const { customThemes, addCustomTheme, deleteCustomTheme } = useThemeStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  const [editingTheme, setEditingTheme] = useState<ThemeDefinition | null>(null);
+  const [isCreatingTheme, setIsCreatingTheme] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Live preview: apply theme immediately when localSettings change
+  useEffect(() => {
+    const allThemes = [...presetThemes, ...customThemes];
+    if (localSettings.useSystemTheme) {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const id = mq.matches ? localSettings.systemThemeDark : localSettings.systemThemeLight;
+      const theme = allThemes.find(t => t.id === id) ?? presetThemes[0];
+      applyTheme(theme);
+    } else {
+      const theme = allThemes.find(t => t.id === localSettings.themeId) ?? presetThemes[0];
+      applyTheme(theme);
+    }
+  }, [localSettings.themeId, localSettings.useSystemTheme, localSettings.systemThemeLight, localSettings.systemThemeDark, customThemes]);
 
   const handleChange = (key: keyof Settings, value: number | boolean | string) => {
-    // Validate numeric inputs to ensure min/max per PRD ranges
     if (typeof value === 'number') {
       if (isNaN(value)) value = 1;
       if (key === 'focusDuration') {
@@ -36,14 +63,11 @@ const SettingsPanel: React.FC = () => {
     const prevEnabled = settings.notebookPagesEnabled;
     const newEnabled = localSettings.notebookPagesEnabled;
 
-    // Handle notebook pages toggle change
     if (!prevEnabled && newEnabled) {
-      // OFF -> ON: initialize pages, clear grace period
       const updatedLocal = { ...localSettings, notebookPagesGracePeriodStart: null };
       await updateSettings(updatedLocal);
       await initializeNotebookPages();
     } else if (prevEnabled && !newEnabled) {
-      // ON -> OFF: confirm and teardown
       let confirmed = false;
       try {
         confirmed = await ask(
@@ -56,7 +80,6 @@ const SettingsPanel: React.FC = () => {
         );
       }
       if (!confirmed) {
-        // User cancelled — revert the toggle and don't save
         setLocalSettings(prev => ({ ...prev, notebookPagesEnabled: true }));
         return;
       }
@@ -67,13 +90,22 @@ const SettingsPanel: React.FC = () => {
       await updateSettings(localSettings);
     }
 
-    // Exit settings mode after saving
     await exitSettingsMode();
   };
 
   const handleCancel = () => {
+    // Revert live preview to saved theme
+    const allThemes = [...presetThemes, ...customThemes];
+    if (settings.useSystemTheme) {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const id = mq.matches ? settings.systemThemeDark : settings.systemThemeLight;
+      const theme = allThemes.find(t => t.id === id) ?? presetThemes[0];
+      applyTheme(theme);
+    } else {
+      const theme = allThemes.find(t => t.id === settings.themeId) ?? presetThemes[0];
+      applyTheme(theme);
+    }
     setLocalSettings(settings);
-    // Exit settings mode without saving
     exitSettingsMode();
   };
 
@@ -83,12 +115,12 @@ const SettingsPanel: React.FC = () => {
         title: 'Restore Default Times',
         kind: 'warning'
       });
-      
+
       if (confirmed) {
         await resetSettings();
         setLocalSettings({ ...defaultSettings, historyPanelVisible: localSettings.historyPanelVisible });
       }
-    } catch (error) {
+    } catch {
       const confirmed = window.confirm('Are you sure you want to restore all timer settings to their default values? This will not affect your history.');
       if (confirmed) {
         await resetSettings();
@@ -103,11 +135,11 @@ const SettingsPanel: React.FC = () => {
         title: 'Clear All History',
         kind: 'warning'
       });
-      
+
       if (confirmed) {
         clearHistory();
       }
-    } catch (error) {
+    } catch {
       const confirmed = window.confirm('Are you sure you want to permanently delete all your session history? This action cannot be undone.');
       if (confirmed) {
         clearHistory();
@@ -121,21 +153,79 @@ const SettingsPanel: React.FC = () => {
         title: 'Factory Reset',
         kind: 'warning'
       });
-      
+
       if (confirmed) {
         await resetAllData();
         await resetSettings();
+        useThemeStore.getState().loadCustomThemes([]);
         await exitSettingsMode();
       }
-    } catch (error) {
+    } catch {
       const confirmed = window.confirm('Are you sure you want to factory reset the app? This will permanently delete all your history and reset every setting back to default. This action cannot be undone.');
       if (confirmed) {
         await resetAllData();
         await resetSettings();
+        useThemeStore.getState().loadCustomThemes([]);
         await exitSettingsMode();
       }
     }
   };
+
+  const handleDeleteCustomTheme = async (themeId: string) => {
+    // If the deleted theme is active, fall back to dark
+    if (localSettings.themeId === themeId) {
+      setLocalSettings(prev => ({ ...prev, themeId: 'dark' }));
+    }
+    if (localSettings.systemThemeLight === themeId) {
+      setLocalSettings(prev => ({ ...prev, systemThemeLight: 'light' }));
+    }
+    if (localSettings.systemThemeDark === themeId) {
+      setLocalSettings(prev => ({ ...prev, systemThemeDark: 'dark' }));
+    }
+    await deleteCustomTheme(themeId);
+  };
+
+  const handleExportTheme = (theme: ThemeDefinition) => {
+    const data = exportTheme(theme);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${theme.name.replace(/\s+/g, '-').toLowerCase()}-theme.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!validateImportData(data)) {
+        alert('Invalid theme file format.');
+        return;
+      }
+      const theme = importTheme(data);
+      await addCustomTheme(theme);
+      setLocalSettings(prev => ({ ...prev, themeId: theme.id }));
+    } catch {
+      alert('Failed to read theme file.');
+    }
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const allThemes = [...presetThemes, ...customThemes];
+  const activeThemeId = localSettings.useSystemTheme
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? localSettings.systemThemeDark : localSettings.systemThemeLight)
+    : localSettings.themeId;
 
   return (
     <div className="h-full bg-lighter-navy flex flex-col">
@@ -170,7 +260,6 @@ const SettingsPanel: React.FC = () => {
             Timer Settings
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Focus Duration */}
             <div>
               <label className="block text-sm font-semibold text-off-white mb-2">
                 Focus Duration (minutes)
@@ -196,7 +285,6 @@ const SettingsPanel: React.FC = () => {
               />
             </div>
 
-            {/* Short Break Duration */}
             <div>
               <label className="block text-sm font-semibold text-off-white mb-2">
                 Short Break Duration (minutes)
@@ -222,7 +310,6 @@ const SettingsPanel: React.FC = () => {
               />
             </div>
 
-            {/* Long Break Duration */}
             <div>
               <label className="block text-sm font-semibold text-off-white mb-2">
                 Long Break Duration (minutes)
@@ -248,7 +335,6 @@ const SettingsPanel: React.FC = () => {
               />
             </div>
 
-            {/* Rounds Before Long Break */}
             <div>
               <label className="block text-sm font-semibold text-off-white mb-2">
                 Rounds Before Long Break
@@ -284,7 +370,6 @@ const SettingsPanel: React.FC = () => {
             Notifications & Audio
           </h3>
           <div className="space-y-4">
-            {/* Sound Enabled */}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-gray-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,7 +394,6 @@ const SettingsPanel: React.FC = () => {
               </button>
             </div>
 
-            {/* Notifications Enabled */}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-gray-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -334,7 +418,6 @@ const SettingsPanel: React.FC = () => {
               </button>
             </div>
 
-            {/* Always On Top */}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-gray-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,7 +444,7 @@ const SettingsPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Appearance */}
+        {/* Appearance / Themes */}
         <div className="bg-gray-text/5 border border-gray-text/10 rounded-xl p-5">
           <h3 className="text-lg font-semibold text-off-white mb-5 flex items-center gap-2">
             <svg className="w-5 h-5 text-tomato" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -369,38 +452,149 @@ const SettingsPanel: React.FC = () => {
             </svg>
             Appearance
           </h3>
-          <div className="grid grid-cols-3 gap-3">
-            {([
-              { value: 'dark', label: 'Dark', icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )},
-              { value: 'light', label: 'Light', icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              )},
-              { value: 'system', label: 'System', icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              )},
-            ] as const).map(({ value, label, icon }) => (
-              <button
-                key={value}
-                onClick={() => handleChange('theme', value)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all duration-200 ${
-                  localSettings.theme === value
-                    ? 'border-tomato bg-tomato/10 text-off-white'
-                    : 'border-gray-text/20 text-gray-text hover:border-gray-text/40 hover:text-off-white'
+
+          {/* System Theme Toggle */}
+          <div className="flex items-center justify-between py-2 mb-4">
+            <div>
+              <label className="text-sm font-semibold text-off-white block">Use System Theme</label>
+              <p className="text-xs text-gray-text mt-0.5">Automatically switch based on OS appearance</p>
+            </div>
+            <button
+              onClick={() => handleChange('useSystemTheme', !localSettings.useSystemTheme)}
+              className={`w-14 h-7 rounded-full transition-all duration-300 relative shadow-inner ${
+                localSettings.useSystemTheme ? 'bg-gradient-to-r from-tomato to-tomato/80' : 'bg-gray-text/30'
+              }`}
+            >
+              <div
+                className={`w-6 h-6 bg-white rounded-full absolute top-0.5 transition-all duration-300 shadow-md ${
+                  localSettings.useSystemTheme ? 'translate-x-7' : 'translate-x-0.5'
                 }`}
-              >
-                {icon}
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            ))}
+              />
+            </button>
           </div>
+
+          {/* System theme light/dark assignment dropdowns */}
+          {localSettings.useSystemTheme && (
+            <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-accent-surface/20 rounded-lg">
+              <div>
+                <label className="block text-xs font-medium text-gray-text mb-1">Light Mode Theme</label>
+                <select
+                  value={localSettings.systemThemeLight}
+                  onChange={(e) => handleChange('systemThemeLight', e.target.value)}
+                  className="w-full px-3 py-2 bg-lighter-navy/80 border border-gray-text/20 rounded-lg text-off-white text-sm focus:outline-none focus:border-tomato"
+                >
+                  {allThemes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-text mb-1">Dark Mode Theme</label>
+                <select
+                  value={localSettings.systemThemeDark}
+                  onChange={(e) => handleChange('systemThemeDark', e.target.value)}
+                  className="w-full px-3 py-2 bg-lighter-navy/80 border border-gray-text/20 rounded-lg text-off-white text-sm focus:outline-none focus:border-tomato"
+                >
+                  {allThemes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Theme Grid */}
+          <div className="grid grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+            {allThemes.map((theme) => {
+              const isActive = activeThemeId === theme.id;
+              const colors = theme.colors;
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => {
+                    if (!localSettings.useSystemTheme) {
+                      handleChange('themeId', theme.id);
+                    }
+                  }}
+                  className={`relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all duration-200 ${
+                    isActive
+                      ? 'border-tomato bg-tomato/10'
+                      : 'border-gray-text/20 hover:border-gray-text/40'
+                  } ${localSettings.useSystemTheme ? 'opacity-60 cursor-default' : ''}`}
+                >
+                  {/* Color stripe preview */}
+                  <div className="flex w-full h-5 rounded overflow-hidden">
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.deepNavy})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.lighterNavy})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.accentSurface})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.tomato})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.offWhite})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.grayText})` }} />
+                    <div style={{ flex: 1, backgroundColor: `rgb(${colors.softGreen})` }} />
+                  </div>
+                  <span className="text-xs font-medium text-off-white truncate w-full text-center">
+                    {theme.name}
+                  </span>
+                  {/* Edit/Delete for custom themes */}
+                  {!theme.builtIn && (
+                    <div className="flex gap-1 absolute top-1 right-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingTheme(theme); }}
+                        className="p-0.5 text-gray-text hover:text-off-white transition-colors"
+                        title="Edit"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCustomTheme(theme.id); }}
+                        className="p-0.5 text-gray-text hover:text-tomato transition-colors"
+                        title="Delete"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => setIsCreatingTheme(true)}
+              className="flex-1 px-3 py-2 text-sm font-medium border border-gray-text/30 text-off-white hover:bg-accent-surface/30 rounded-lg transition-colors"
+            >
+              Create Theme
+            </button>
+            <button
+              onClick={handleImport}
+              className="flex-1 px-3 py-2 text-sm font-medium border border-gray-text/30 text-off-white hover:bg-accent-surface/30 rounded-lg transition-colors"
+            >
+              Import
+            </button>
+            <button
+              onClick={() => {
+                const theme = allThemes.find(t => t.id === activeThemeId);
+                if (theme) handleExportTheme(theme);
+              }}
+              className="flex-1 px-3 py-2 text-sm font-medium border border-gray-text/30 text-off-white hover:bg-accent-surface/30 rounded-lg transition-colors"
+            >
+              Export
+            </button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
 
         {/* Advanced Settings */}
@@ -427,7 +621,7 @@ const SettingsPanel: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          
+
           {isDangerZoneOpen && (
             <div className="space-y-6 mt-4">
               {/* Layout Balance */}
@@ -507,7 +701,7 @@ const SettingsPanel: React.FC = () => {
                     </svg>
                     Restore Default Times
                   </button>
-                  
+
                   <button
                     onClick={handleClearHistory}
                     className="w-full px-4 py-2.5 border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white rounded-md transition-colors duration-200 text-sm font-medium flex items-center justify-center gap-2"
@@ -517,7 +711,7 @@ const SettingsPanel: React.FC = () => {
                     </svg>
                     Clear All History
                   </button>
-                  
+
                   <button
                     onClick={handleResetAppData}
                     className="w-full px-4 py-2.5 border-2 border-tomato text-tomato hover:bg-tomato hover:text-white rounded-md transition-colors duration-200 text-sm font-semibold flex items-center justify-center gap-2"
@@ -549,6 +743,21 @@ const SettingsPanel: React.FC = () => {
           Save
         </button>
       </div>
+
+      {/* Theme Editor Modal */}
+      {(isCreatingTheme || editingTheme) && (
+        <ThemeEditor
+          theme={editingTheme ?? undefined}
+          onClose={() => { setIsCreatingTheme(false); setEditingTheme(null); }}
+          onSave={(theme) => {
+            if (!localSettings.useSystemTheme) {
+              setLocalSettings(prev => ({ ...prev, themeId: theme.id }));
+            }
+            setIsCreatingTheme(false);
+            setEditingTheme(null);
+          }}
+        />
+      )}
     </div>
   );
 };

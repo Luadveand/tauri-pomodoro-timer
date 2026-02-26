@@ -1,5 +1,6 @@
 import { Settings } from '../stores/settingsStore';
 import { HistoryEntry } from '../types';
+import { ThemeDefinition } from '../themes/types';
 
 let store: any = null;
 
@@ -64,6 +65,7 @@ export interface AppData {
   activeNotes: string;
   notebookPages: Array<{ id: string; name: string; notes: string }>;
   activePageId: string | null;
+  customThemes: ThemeDefinition[];
 }
 
 const defaultData: AppData = {
@@ -78,7 +80,10 @@ const defaultData: AppData = {
     keepCompletedAcrossPhases: false,
     notebookPagesEnabled: false,
     notebookPagesGracePeriodStart: null,
-    theme: 'dark',
+    themeId: 'dark',
+    useSystemTheme: false,
+    systemThemeLight: 'light',
+    systemThemeDark: 'dark',
     historyPanelVisible: true,
     notesPanelVisible: true,
     leftPanelWidth: 0.3,
@@ -88,25 +93,45 @@ const defaultData: AppData = {
   activeNotes: '',
   notebookPages: [],
   activePageId: null,
+  customThemes: [],
 };
 
 export const loadAppData = async (): Promise<AppData> => {
   try {
     const storeInstance = await getStore();
-    const settings = await storeInstance.get('settings') as Settings | null;
+    const settings = await storeInstance.get('settings') as Record<string, unknown> | null;
     const history = await storeInstance.get('history') as HistoryEntry[] | null;
     const activeNotes = await storeInstance.get('activeNotes') as string | null;
     const notebookPages = await storeInstance.get('notebookPages') as Array<{ id: string; name: string; notes: string }> | null;
     const activePageId = await storeInstance.get('activePageId') as string | null;
+    const customThemes = await storeInstance.get('customThemes') as ThemeDefinition[] | null;
 
-    const mergedSettings = { ...defaultData.settings, ...(settings || {}) };
+    // Migrate old theme field to new theme fields
+    let mergedSettings = { ...defaultData.settings, ...(settings || {}) } as Settings & { theme?: string };
+    if (settings && 'theme' in settings && !('themeId' in settings)) {
+      const oldTheme = settings.theme as string;
+      if (oldTheme === 'system') {
+        mergedSettings.themeId = 'dark';
+        mergedSettings.useSystemTheme = true;
+        mergedSettings.systemThemeLight = 'light';
+        mergedSettings.systemThemeDark = 'dark';
+      } else if (oldTheme === 'light') {
+        mergedSettings.themeId = 'light';
+        mergedSettings.useSystemTheme = false;
+      } else {
+        mergedSettings.themeId = 'dark';
+        mergedSettings.useSystemTheme = false;
+      }
+      delete mergedSettings.theme;
+    }
 
     return {
-      settings: mergedSettings,
+      settings: mergedSettings as Settings,
       history: history || defaultData.history,
       activeNotes: activeNotes || defaultData.activeNotes,
       notebookPages: notebookPages || defaultData.notebookPages,
       activePageId: activePageId || defaultData.activePageId,
+      customThemes: customThemes || defaultData.customThemes,
     };
   } catch (error) {
     console.error('Error loading app data:', error);
@@ -165,6 +190,17 @@ export const saveActivePageId = async (pageId: string | null): Promise<void> => 
     await storeInstance.save();
   } catch (error) {
     console.error('[Storage] Error saving active page ID:', error);
+    throw error;
+  }
+};
+
+export const saveCustomThemes = async (themes: ThemeDefinition[]): Promise<void> => {
+  try {
+    const storeInstance = await getStore();
+    await storeInstance.set('customThemes', themes);
+    await storeInstance.save();
+  } catch (error) {
+    console.error('[Storage] Error saving custom themes:', error);
     throw error;
   }
 };
