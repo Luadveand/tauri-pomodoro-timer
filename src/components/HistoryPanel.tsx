@@ -45,6 +45,8 @@ const HistoryPanel: React.FC = () => {
     setDateRange('all');
   }, []);
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const filterCount = getActiveFilterCount(phaseFilters, statusFilters, dateRange);
 
   const filteredHistory = useMemo(
@@ -89,22 +91,40 @@ const HistoryPanel: React.FC = () => {
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-text/20 flex items-center justify-between">
         <h3 className="text-lg font-medium text-off-white">History</h3>
-        {filterCount > 0 && (
-          <span className="text-xs bg-tomato/20 text-tomato px-2 py-0.5 rounded-full">
-            {filterCount} {filterCount === 1 ? 'filter' : 'filters'}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {filterCount > 0 && (
+            <span className="text-xs bg-tomato/20 text-tomato px-2 py-0.5 rounded-full">
+              {filterCount} {filterCount === 1 ? 'filter' : 'filters'}
+            </span>
+          )}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="p-1 rounded transition-colors hover:bg-gray-text/10"
+            title="Toggle filters"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className={`w-4 h-4 ${showFilters || filterCount > 0 ? 'text-tomato' : 'text-gray-text'}`}
+            >
+              <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 .8 1.6L10 9.267V13a1 1 0 0 1-.553.894l-2 1A1 1 0 0 1 6 14v-4.733L1.2 3.6A1 1 0 0 1 1 3Z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
-      <HistoryFilters
-        phaseFilters={phaseFilters}
-        statusFilters={statusFilters}
-        dateRange={dateRange}
-        onTogglePhase={handleTogglePhase}
-        onToggleStatus={handleToggleStatus}
-        onDateRangeChange={setDateRange}
-      />
+      {showFilters && (
+        <HistoryFilters
+          phaseFilters={phaseFilters}
+          statusFilters={statusFilters}
+          dateRange={dateRange}
+          onTogglePhase={handleTogglePhase}
+          onToggleStatus={handleToggleStatus}
+          onDateRangeChange={setDateRange}
+        />
+      )}
 
       {/* History List */}
       <div className="flex-1 overflow-y-auto min-h-0">
