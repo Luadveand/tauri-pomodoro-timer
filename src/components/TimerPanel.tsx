@@ -152,7 +152,7 @@ const TimerPanel: React.FC = () => {
             <div className="flex flex-col items-center">
               {/* Countdown Display */}
               <div className="mb-3">
-                <div className={`timer-font font-bold text-white transition-all duration-300 ${
+                <div className={`timer-font font-bold text-off-white transition-all duration-300 ${
                   !effectiveNotesVisible ? (settings.settingsMode ? 'text-5xl md:text-6xl lg:text-7xl' : 'text-7xl') : 'text-5xl'
                 }`}>
                   {formatTime(timeLeft)}
@@ -174,7 +174,7 @@ const TimerPanel: React.FC = () => {
           <>
             {/* Countdown Display */}
             <div className="mb-6">
-              <div className={`timer-font font-bold text-white transition-all duration-300 ${
+              <div className={`timer-font font-bold text-off-white transition-all duration-300 ${
                 !effectiveNotesVisible ? (settings.settingsMode ? 'text-6xl md:text-7xl lg:text-8xl' : 'text-8xl') : 'text-6xl'
               }`}>
                 {formatTime(timeLeft)}

@@ -78,6 +78,7 @@ const defaultData: AppData = {
     keepCompletedAcrossPhases: false,
     notebookPagesEnabled: false,
     notebookPagesGracePeriodStart: null,
+    theme: 'dark',
     historyPanelVisible: true,
     notesPanelVisible: true,
     leftPanelWidth: 0.3,

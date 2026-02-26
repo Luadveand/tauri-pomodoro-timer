@@ -107,6 +107,22 @@ function MainApp() {
     }).catch(() => { /* not in Tauri context */ });
   }, [settings.alwaysOnTop]);
 
+  // Apply theme to DOM
+  useEffect(() => {
+    const applyTheme = (theme: 'light' | 'dark') => {
+      document.documentElement.setAttribute('data-theme', theme);
+    };
+    if (settings.theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent | MediaQueryList) => applyTheme(e.matches ? 'dark' : 'light');
+      handler(mq);
+      mq.addEventListener('change', handler as (e: MediaQueryListEvent) => void);
+      return () => mq.removeEventListener('change', handler as (e: MediaQueryListEvent) => void);
+    } else {
+      applyTheme(settings.theme);
+    }
+  }, [settings.theme]);
+
   // Track window width for responsive layout
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);

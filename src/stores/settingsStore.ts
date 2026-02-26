@@ -12,6 +12,7 @@ export interface Settings {
   keepCompletedAcrossPhases: boolean;
   notebookPagesEnabled: boolean;
   notebookPagesGracePeriodStart: string | null;
+  theme: 'light' | 'dark' | 'system';
   historyPanelVisible: boolean;
   notesPanelVisible: boolean;
   leftPanelWidth: number;
@@ -45,6 +46,7 @@ export const defaultSettings: Settings = {
   keepCompletedAcrossPhases: false,
   notebookPagesEnabled: false,
   notebookPagesGracePeriodStart: null,
+  theme: 'dark',
   historyPanelVisible: true,
   notesPanelVisible: true,
   leftPanelWidth: 0.8,
