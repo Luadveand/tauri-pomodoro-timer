@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import HistoryEntry from './HistoryEntry';
+import HistoryFilters from './HistoryFilters';
+import { filterHistoryEntries, getActiveFilterCount } from '../utils/historyHelpers';
+import type { Phase, HistoryEntry as HistoryEntryType } from '../types';
+import type { DateRangePreset } from '../utils/historyHelpers';
 
 const HistoryPanel: React.FC = () => {
   const { history, deleteHistoryEntry } = useTimerStore();
+
+  const [phaseFilters, setPhaseFilters] = useState<Set<Phase>>(new Set());
+  const [statusFilters, setStatusFilters] = useState<Set<HistoryEntryType['status']>>(new Set());
+  const [dateRange, setDateRange] = useState<DateRangePreset>('all');
 
   const handleDeleteEntry = (id: string) => {
     try {
@@ -13,11 +21,41 @@ const HistoryPanel: React.FC = () => {
     }
   };
 
+  const handleTogglePhase = useCallback((phase: Phase) => {
+    setPhaseFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(phase)) next.delete(phase);
+      else next.add(phase);
+      return next;
+    });
+  }, []);
 
-  const groupedHistory = React.useMemo(() => {
+  const handleToggleStatus = useCallback((status: HistoryEntryType['status']) => {
+    setStatusFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setPhaseFilters(new Set());
+    setStatusFilters(new Set());
+    setDateRange('all');
+  }, []);
+
+  const filterCount = getActiveFilterCount(phaseFilters, statusFilters, dateRange);
+
+  const filteredHistory = useMemo(
+    () => filterHistoryEntries(history, phaseFilters, statusFilters, dateRange),
+    [history, phaseFilters, statusFilters, dateRange],
+  );
+
+  const groupedHistory = useMemo(() => {
     const groups: { [key: string]: typeof history } = {};
 
-    history.forEach((entry) => {
+    filteredHistory.forEach((entry) => {
       const date = new Date(entry.timestamp);
       const today = new Date();
       const yesterday = new Date();
@@ -44,20 +82,45 @@ const HistoryPanel: React.FC = () => {
     });
 
     return groups;
-  }, [history]);
+  }, [filteredHistory]);
 
   return (
     <div className="h-full bg-lighter-navy flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-text/20">
+      <div className="px-4 py-3 border-b border-gray-text/20 flex items-center justify-between">
         <h3 className="text-lg font-medium text-off-white">History</h3>
+        {filterCount > 0 && (
+          <span className="text-xs bg-tomato/20 text-tomato px-2 py-0.5 rounded-full">
+            {filterCount} {filterCount === 1 ? 'filter' : 'filters'}
+          </span>
+        )}
       </div>
+
+      {/* Filters */}
+      <HistoryFilters
+        phaseFilters={phaseFilters}
+        statusFilters={statusFilters}
+        dateRange={dateRange}
+        onTogglePhase={handleTogglePhase}
+        onToggleStatus={handleToggleStatus}
+        onDateRangeChange={setDateRange}
+      />
 
       {/* History List */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {history.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-text text-sm">No history yet</p>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <p className="text-gray-text text-sm">No matching entries</p>
+            <button
+              onClick={clearAllFilters}
+              className="text-xs text-tomato hover:text-tomato/80 transition-colors"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           <div className="min-h-full">
