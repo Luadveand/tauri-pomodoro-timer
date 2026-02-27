@@ -2,16 +2,16 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import HistoryEntry from './HistoryEntry';
 import HistoryFilters from './HistoryFilters';
-import { filterHistoryEntries, getActiveFilterCount } from '../utils/historyHelpers';
+import { filterHistoryEntries, getActiveFilterCount, DEFAULT_DATE_RANGE } from '../utils/historyHelpers';
 import type { Phase, HistoryEntry as HistoryEntryType } from '../types';
-import type { DateRangePreset } from '../utils/historyHelpers';
+import type { DateRangeValue } from '../utils/historyHelpers';
 
 const HistoryPanel: React.FC = () => {
   const { history, deleteHistoryEntry } = useTimerStore();
 
   const [phaseFilters, setPhaseFilters] = useState<Set<Phase>>(new Set());
   const [statusFilters, setStatusFilters] = useState<Set<HistoryEntryType['status']>>(new Set());
-  const [dateRange, setDateRange] = useState<DateRangePreset>('all');
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
 
   const handleDeleteEntry = (id: string) => {
     try {
@@ -42,7 +42,7 @@ const HistoryPanel: React.FC = () => {
   const clearAllFilters = useCallback(() => {
     setPhaseFilters(new Set());
     setStatusFilters(new Set());
-    setDateRange('all');
+    setDateRange(DEFAULT_DATE_RANGE);
   }, []);
 
   const [showFilters, setShowFilters] = useState(false);
