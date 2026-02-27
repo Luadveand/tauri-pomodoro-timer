@@ -45,14 +45,18 @@ const isInRange = (date: Date, start: Date, end: Date): boolean => {
   return d >= start.getTime() && d <= end.getTime();
 };
 
+const POPOVER_ESTIMATED_HEIGHT = 280;
+
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [openAbove, setOpenAbove] = useState(false);
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [pendingStart, setPendingStart] = useState<Date | null>(null);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Close on click outside
   useEffect(() => {
@@ -60,12 +64,21 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setOpenAbove(false);
         setPendingStart(null);
         setHoveredDate(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen]);
+
+  // Auto-flip popover above trigger when it would overflow viewport
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setOpenAbove(spaceBelow < POPOVER_ESTIMATED_HEIGHT);
   }, [isOpen]);
 
   // When opening, navigate calendar to relevant month
@@ -86,6 +99,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
     }
     setPendingStart(null);
     setHoveredDate(null);
+    setOpenAbove(false);
     setIsOpen(true);
   }, [isOpen, value]);
 
@@ -94,6 +108,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
       onChange({ kind: 'preset', preset });
       setPendingStart(null);
       setHoveredDate(null);
+      setOpenAbove(false);
       setIsOpen(false);
     },
     [onChange],
@@ -121,6 +136,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
       onChange({ kind: 'custom', range: { start, end: exclusiveEnd } });
       setPendingStart(null);
       setHoveredDate(null);
+      setOpenAbove(false);
       setIsOpen(false);
     },
     [pendingStart, onChange],
@@ -204,6 +220,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
     <div className="relative" ref={containerRef}>
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         onClick={handleOpen}
         className="w-full text-xs rounded border bg-lighter-navy/80 border-gray-text/20 text-off-white px-2 py-1.5 flex items-center justify-between hover:border-gray-text/40 transition-colors text-left"
       >
@@ -224,7 +241,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
 
       {/* Popover */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-lighter-navy border border-gray-text/20 rounded-lg shadow-lg p-3 space-y-3">
+        <div className={`absolute left-0 right-0 z-50 bg-lighter-navy border border-gray-text/20 rounded-lg shadow-lg p-2.5 space-y-2 ${openAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
           {/* Preset chips */}
           <div className="flex flex-wrap gap-1.5">
             {PRESET_CHIPS.map(({ preset, label }) => (
@@ -289,7 +306,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
             </div>
 
             {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
+            <div className="grid grid-cols-7 mb-0.5">
               {DAY_HEADERS.map((d) => (
                 <div key={d} className="text-[10px] text-gray-text text-center py-0.5">
                   {d}
@@ -306,7 +323,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onChange }) =>
                   onMouseEnter={() => pendingStart && setHoveredDate(date)}
                   onMouseLeave={() => pendingStart && setHoveredDate(null)}
                   disabled={isFutureDate(date)}
-                  className={`w-8 h-7 text-[11px] rounded transition-colors ${getDayClassName(date)}`}
+                  className={`w-7 h-6 text-[11px] rounded transition-colors ${getDayClassName(date)}`}
                 >
                   {date.getDate()}
                 </button>
