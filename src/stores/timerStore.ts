@@ -3,9 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Settings } from './settingsStore';
 import { playNotificationSound } from '../utils/sound';
 import { sendPhaseNotification } from '../utils/notifications';
-import { saveHistory, clearAllData, saveActiveNotes } from '../utils/storage';
-import { Phase, TimerStatus, HistoryEntry, LineObject } from '../types';
-import { debugLogger } from '../components/DebugPanel';
+import { saveHistory, clearAllData, saveActiveNotes, saveNotebookPages, saveActivePageId } from '../utils/storage';
+import { Phase, TimerStatus, HistoryEntry, LineObject, NotebookPage } from '../types';
 
 interface TimerStore {
   currentPhase: Phase;
@@ -16,6 +15,8 @@ interface TimerStore {
   history: HistoryEntry[];
   activeNotes: string;
   lines: LineObject[];
+  notebookPages: NotebookPage[];
+  activePageId: string | null;
 
   startTimer: () => void;
   pauseTimer: () => void;
@@ -48,6 +49,17 @@ interface TimerStore {
   reorderLines: (activeId: string, overId: string) => void;
   cleanupNotes: (settings: Settings) => void;
   savePhaseSnapshot: (settings: Settings, statusOverride?: 'completed' | 'skipped' | 'stopped') => Promise<void>;
+
+  // Notebook pages methods
+  initializeNotebookPages: () => Promise<void>;
+  teardownNotebookPages: () => Promise<void>;
+  mergeAllPagesIntoOne: () => Promise<void>;
+  addPage: (name?: string) => Promise<void>;
+  deletePage: (pageId: string) => Promise<void>;
+  renamePage: (pageId: string, newName: string) => void;
+  reorderPages: (activeId: string, overId: string) => void;
+  switchPage: (pageId: string) => void;
+  loadNotebookPages: (pages: NotebookPage[], activePageId: string | null) => void;
 }
 
 export const useTimerStore = create<TimerStore>((set, get) => ({
@@ -59,6 +71,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   history: [],
   activeNotes: '',
   lines: [],
+  notebookPages: [],
+  activePageId: null,
 
   startTimer: () => {
     set({ status: 'running' });
@@ -160,23 +174,23 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     if (!entryExists) {
       const errorMsg = `Entry not found in current history: ${id}`;
       console.error(errorMsg);
-      debugLogger.log(errorMsg, 'error');
+      console.error(errorMsg);
       return;
     }
     
     const entryToDelete = currentHistory.find(e => e.id === id);
-    debugLogger.log(`Deleting history entry: ${entryToDelete?.phase} (${entryToDelete?.status}) from ${new Date(entryToDelete?.timestamp || '').toLocaleTimeString()}`);
+    console.log(`Deleting history entry: ${entryToDelete?.phase} (${entryToDelete?.status}) from ${new Date(entryToDelete?.timestamp || '').toLocaleTimeString()}`);
     
     const newHistory = currentHistory.filter((entry) => entry.id !== id);
     set({ history: newHistory });
     
     try {
       await saveHistory(newHistory);
-      debugLogger.log('History entry deleted successfully');
+      console.log('History entry deleted successfully');
     } catch (error) {
       const errorMsg = `Failed to save history after deletion: ${error}`;
       console.error(errorMsg);
-      debugLogger.log(errorMsg, 'error');
+      console.error(errorMsg);
     }
   },
 
@@ -190,6 +204,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
       timeLeft: 25 * 60,
       activeNotes: '',
       lines: [],
+      notebookPages: [],
+      activePageId: null,
     });
     try {
       await clearAllData();
@@ -346,77 +362,91 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   cleanupNotes: (settings) => {
     const state = get();
-    if (!state.activeNotes || settings.keepCompletedAcrossPhases) {
+    if (settings.keepCompletedAcrossPhases) {
       return;
     }
 
-    const lines = state.activeNotes.split('\n');
-    const cleanedLines: string[] = [];
-    let i = 0;
-    
-    while (i < lines.length) {
-      const line = lines[i];
-      const trimmedLine = line.trim();
-      
-      // Keep notes (lines starting with #)
-      if (trimmedLine.startsWith('#')) {
-        cleanedLines.push(line);
-        i++;
-        continue;
-      }
-      
-      // Check if this is a top-level task line
-      const isIndented = line.startsWith('\t') || line.startsWith('  ');
-      if (!isIndented && trimmedLine) {
-        // This is a top-level task - check if it's completed
-        const isCompleted = trimmedLine.startsWith('✓');
-        
-        if (!isCompleted) {
-          // Keep incomplete task and its children
+    const cleanNotesString = (notes: string): string => {
+      if (!notes) return '';
+      const lines = notes.split('\n');
+      const cleanedLines: string[] = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
+
+        if (trimmedLine.startsWith('#')) {
           cleanedLines.push(line);
           i++;
-          
-          // Add any following children
-          while (i < lines.length) {
-            const childLine = lines[i];
-            const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
-            if (isChildIndented) {
-              cleanedLines.push(childLine);
-              i++;
-            } else {
-              break;
+          continue;
+        }
+
+        const isIndented = line.startsWith('\t') || line.startsWith('  ');
+        if (!isIndented && trimmedLine) {
+          const isCompleted = trimmedLine.startsWith('✓');
+
+          if (!isCompleted) {
+            cleanedLines.push(line);
+            i++;
+            while (i < lines.length) {
+              const childLine = lines[i];
+              const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
+              if (isChildIndented) {
+                cleanedLines.push(childLine);
+                i++;
+              } else {
+                break;
+              }
+            }
+          } else {
+            i++;
+            while (i < lines.length) {
+              const childLine = lines[i];
+              const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
+              if (isChildIndented) {
+                i++;
+              } else {
+                break;
+              }
             }
           }
         } else {
-          // Skip completed task and its children
+          cleanedLines.push(line);
           i++;
-          while (i < lines.length) {
-            const childLine = lines[i];
-            const isChildIndented = childLine.startsWith('\t') || childLine.startsWith('  ');
-            if (isChildIndented) {
-              i++;
-            } else {
-              break;
-            }
-          }
         }
-      } else {
-        // This is an orphaned child or empty line, keep it
-        cleanedLines.push(line);
-        i++;
       }
-    }
-    
-    const cleanedNotes = cleanedLines.join('\n').trim();
 
-    set({ activeNotes: cleanedNotes });
-    
-    // Also update the lines array to sync with the cleaned notes
-    const newLines = get().parseNotesToLines(cleanedNotes);
-    set({ lines: newLines });
-    saveActiveNotes(cleanedNotes).catch(error => {
-      console.error('Failed to save cleaned notes:', error);
-    });
+      return cleanedLines.join('\n').trim();
+    };
+
+    // Clean active notes
+    if (state.activeNotes) {
+      const cleanedNotes = cleanNotesString(state.activeNotes);
+      set({ activeNotes: cleanedNotes });
+      const newLines = get().parseNotesToLines(cleanedNotes);
+      set({ lines: newLines });
+      saveActiveNotes(cleanedNotes).catch(error => {
+        console.error('Failed to save cleaned notes:', error);
+      });
+    }
+
+    // When notebook pages are enabled, clean ALL pages
+    if (state.notebookPages.length > 0) {
+      const updatedPages = state.notebookPages.map(page => {
+        if (page.id === state.activePageId) {
+          // Active page was already cleaned above
+          const cleanedNotes = cleanNotesString(page.notes);
+          return { ...page, notes: cleanedNotes, lines: get().parseNotesToLines(cleanedNotes) };
+        }
+        const cleanedNotes = cleanNotesString(page.notes);
+        return { ...page, notes: cleanedNotes, lines: get().parseNotesToLines(cleanedNotes) };
+      });
+      set({ notebookPages: updatedPages });
+      saveNotebookPages(updatedPages.map(p => ({ id: p.id, name: p.name, notes: p.notes }))).catch(error => {
+        console.error('Failed to save cleaned notebook pages:', error);
+      });
+    }
   },
 
   savePhaseSnapshot: async (settings: Settings, statusOverride?: 'completed' | 'skipped' | 'stopped') => {
@@ -431,8 +461,21 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
       phase: state.currentPhase,
       durationMinutes: getDurationForPhase(state.currentPhase, settings),
       status: snapshotStatus,
-      notesSnapshot: state.activeNotes,
     };
+
+    // When pages exist, save pagesSnapshot; otherwise save notesSnapshot
+    if (state.notebookPages.length > 0 && state.activePageId) {
+      // Ensure current active page is up-to-date before snapshot
+      const updatedPages = state.notebookPages.map(p =>
+        p.id === state.activePageId ? { ...p, notes: state.activeNotes, lines: state.lines } : p
+      );
+      entry.pagesSnapshot = {
+        pages: updatedPages.map(p => ({ id: p.id, name: p.name, notes: p.notes })),
+        activePageId: state.activePageId,
+      };
+    } else {
+      entry.notesSnapshot = state.activeNotes;
+    }
 
     await get().addHistoryEntry(entry);
   },
@@ -450,6 +493,19 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
       const notes = get().linesToNotes(lines);
 
       set({ activeNotes: notes, lines });
+
+      // When pages are enabled, also update the active page entry
+      const state = get();
+      if (state.notebookPages.length > 0 && state.activePageId) {
+        const updatedPages = state.notebookPages.map(p =>
+          p.id === state.activePageId ? { ...p, notes, lines } : p
+        );
+        set({ notebookPages: updatedPages });
+        saveNotebookPages(updatedPages.map(p => ({ id: p.id, name: p.name, notes: p.notes }))).catch(error => {
+          console.error('Failed to save notebook pages:', error);
+        });
+      }
+
       try {
         await saveActiveNotes(notes);
       } catch (error) {
@@ -716,6 +772,206 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
       })
       .filter(line => line.trim() !== '') // Filter after mapping to preserve structure
       .join('\n');
+  },
+
+  // --- Notebook Pages Methods ---
+
+  initializeNotebookPages: async () => {
+    const state = get();
+    const pageId = uuidv4();
+    const page: NotebookPage = {
+      id: pageId,
+      name: 'Page 1',
+      notes: state.activeNotes,
+      lines: state.lines,
+    };
+    set({ notebookPages: [page], activePageId: pageId });
+    try {
+      await saveNotebookPages([{ id: pageId, name: page.name, notes: page.notes }]);
+      await saveActivePageId(pageId);
+    } catch (error) {
+      console.error('Failed to initialize notebook pages:', error);
+    }
+  },
+
+  teardownNotebookPages: async () => {
+    // Active page's notes/lines are already in activeNotes/lines, just clear pages
+    set({ notebookPages: [], activePageId: null });
+    try {
+      await saveNotebookPages([]);
+      await saveActivePageId(null);
+    } catch (error) {
+      console.error('Failed to teardown notebook pages:', error);
+    }
+  },
+
+  mergeAllPagesIntoOne: async () => {
+    const state = get();
+    const mergedParts: string[] = [];
+
+    for (const page of state.notebookPages) {
+      mergedParts.push(`# ${page.name}`);
+      if (page.notes.trim()) {
+        mergedParts.push(page.notes);
+      }
+    }
+
+    const mergedNotes = mergedParts.join('\n');
+    const mergedLines = get().parseNotesToLines(mergedNotes);
+
+    set({
+      activeNotes: mergedNotes,
+      lines: mergedLines,
+      notebookPages: [],
+      activePageId: null,
+    });
+
+    try {
+      await saveActiveNotes(mergedNotes);
+      await saveNotebookPages([]);
+      await saveActivePageId(null);
+    } catch (error) {
+      console.error('Failed to merge all pages:', error);
+    }
+  },
+
+  addPage: async (name?) => {
+    const state = get();
+    if (state.notebookPages.length >= 20) return;
+
+    // Save current page state first
+    const updatedPages = state.notebookPages.map(p =>
+      p.id === state.activePageId ? { ...p, notes: state.activeNotes, lines: state.lines } : p
+    );
+
+    const pageName = name || `Page ${updatedPages.length + 1}`;
+    const newPageId = uuidv4();
+    const newPage: NotebookPage = {
+      id: newPageId,
+      name: pageName,
+      notes: '',
+      lines: [],
+    };
+
+    const allPages = [...updatedPages, newPage];
+    set({
+      notebookPages: allPages,
+      activePageId: newPageId,
+      activeNotes: '',
+      lines: [],
+    });
+
+    try {
+      await saveNotebookPages(allPages.map(p => ({ id: p.id, name: p.name, notes: p.notes })));
+      await saveActivePageId(newPageId);
+      await saveActiveNotes('');
+    } catch (error) {
+      console.error('Failed to add page:', error);
+    }
+  },
+
+  deletePage: async (pageId) => {
+    const state = get();
+    if (state.notebookPages.length <= 1) return;
+
+    const remaining = state.notebookPages.filter(p => p.id !== pageId);
+    const isDeletingActive = state.activePageId === pageId;
+
+    if (isDeletingActive) {
+      const newActive = remaining[0];
+      set({
+        notebookPages: remaining,
+        activePageId: newActive.id,
+        activeNotes: newActive.notes,
+        lines: newActive.lines,
+      });
+      try {
+        await saveNotebookPages(remaining.map(p => ({ id: p.id, name: p.name, notes: p.notes })));
+        await saveActivePageId(newActive.id);
+        await saveActiveNotes(newActive.notes);
+      } catch (error) {
+        console.error('Failed to delete page:', error);
+      }
+    } else {
+      set({ notebookPages: remaining });
+      try {
+        await saveNotebookPages(remaining.map(p => ({ id: p.id, name: p.name, notes: p.notes })));
+      } catch (error) {
+        console.error('Failed to delete page:', error);
+      }
+    }
+  },
+
+  renamePage: (pageId, newName) => {
+    const state = get();
+    const safeName = newName.trim() || 'Untitled';
+    const updatedPages = state.notebookPages.map(p =>
+      p.id === pageId ? { ...p, name: safeName } : p
+    );
+    set({ notebookPages: updatedPages });
+    saveNotebookPages(updatedPages.map(p => ({ id: p.id, name: p.name, notes: p.notes }))).catch(error => {
+      console.error('Failed to rename page:', error);
+    });
+  },
+
+  reorderPages: (activeId, overId) => {
+    if (activeId === overId) return;
+    const state = get();
+    const pages = [...state.notebookPages];
+    const activeIndex = pages.findIndex(p => p.id === activeId);
+    const overIndex = pages.findIndex(p => p.id === overId);
+    if (activeIndex === -1 || overIndex === -1) return;
+
+    const [movedPage] = pages.splice(activeIndex, 1);
+    pages.splice(overIndex, 0, movedPage);
+    set({ notebookPages: pages });
+    saveNotebookPages(pages.map(p => ({ id: p.id, name: p.name, notes: p.notes }))).catch(error => {
+      console.error('Failed to reorder pages:', error);
+    });
+  },
+
+  switchPage: (pageId) => {
+    const state = get();
+    if (pageId === state.activePageId) return;
+
+    // Save current page state back to array
+    const updatedPages = state.notebookPages.map(p =>
+      p.id === state.activePageId ? { ...p, notes: state.activeNotes, lines: state.lines } : p
+    );
+
+    const targetPage = updatedPages.find(p => p.id === pageId);
+    if (!targetPage) return;
+
+    set({
+      notebookPages: updatedPages,
+      activePageId: pageId,
+      activeNotes: targetPage.notes,
+      lines: targetPage.lines,
+    });
+
+    // Persist asynchronously
+    saveNotebookPages(updatedPages.map(p => ({ id: p.id, name: p.name, notes: p.notes }))).catch(error => {
+      console.error('Failed to save pages on switch:', error);
+    });
+    saveActivePageId(pageId).catch(error => {
+      console.error('Failed to save active page ID on switch:', error);
+    });
+    saveActiveNotes(targetPage.notes).catch(error => {
+      console.error('Failed to save active notes on switch:', error);
+    });
+  },
+
+  loadNotebookPages: (pages, activePageId) => {
+    // Fallback: if activePageId not found, default to pages[0]
+    const validActiveId = pages.some(p => p.id === activePageId) ? activePageId : (pages[0]?.id || null);
+    const activePage = pages.find(p => p.id === validActiveId);
+
+    set({
+      notebookPages: pages,
+      activePageId: validActiveId,
+      activeNotes: activePage?.notes || '',
+      lines: activePage?.lines || [],
+    });
   },
 }));
 

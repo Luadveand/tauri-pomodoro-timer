@@ -8,9 +8,11 @@
       {
         "label": "main",
         "title": "Pomodoro Timer",
-        "width": 800,
-        "height": 500,
-        "resizable": false
+        "width": 1000,
+        "height": 600,
+        "minWidth": 800,
+        "minHeight": 500,
+        "resizable": true
       }
     ],
     "security": {

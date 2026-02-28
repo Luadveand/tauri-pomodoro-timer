@@ -4,13 +4,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'deep-navy': '#1a1a2e',
-        'lighter-navy': '#16213e',
-        'accent-surface': '#0f3460',
-        'tomato': '#e94560',
-        'off-white': '#f5f5f5',
-        'gray-text': '#8892a4',
-        'soft-green': '#4ecca3',
+        'deep-navy': 'rgb(var(--color-deep-navy) / <alpha-value>)',
+        'lighter-navy': 'rgb(var(--color-lighter-navy) / <alpha-value>)',
+        'accent-surface': 'rgb(var(--color-accent-surface) / <alpha-value>)',
+        'tomato': 'rgb(var(--color-tomato) / <alpha-value>)',
+        'off-white': 'rgb(var(--color-off-white) / <alpha-value>)',
+        'gray-text': 'rgb(var(--color-gray-text) / <alpha-value>)',
+        'soft-green': 'rgb(var(--color-soft-green) / <alpha-value>)',
       },
       fontFamily: {
         'mono': ['JetBrains Mono', 'monospace'],
@@ -20,4 +20,3 @@ module.exports = {
   },
   plugins: [],
 }
-

@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTimerStore } from '../stores/timerStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useTimer } from '../utils/useTimer';
 import Controls from './Controls';
 import RoundTracker from './RoundTracker';
-import SettingsModal from './SettingsModal';
 
 const TimerPanel: React.FC = () => {
   const { currentPhase, timeLeft, resetCycle } = useTimerStore();
-  const { settings } = useSettingsStore();
-  const [showSettings, setShowSettings] = useState(false);
+  const { settings, updateSettings, enterSettingsMode } = useSettingsStore();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   
   // Initialize timer logic
   useTimer();
@@ -37,59 +37,161 @@ const TimerPanel: React.FC = () => {
     resetCycle(settings);
   };
 
+  const toggleHistoryPanel = () => {
+    updateSettings({ historyPanelVisible: !settings.historyPanelVisible });
+    setShowMenu(false);
+  };
+
+  const toggleNotesPanel = () => {
+    updateSettings({ notesPanelVisible: !settings.notesPanelVisible });
+    setShowMenu(false);
+  };
+
+  // Click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // In settings mode, timer should behave as if notes panel is closed
+  const effectiveNotesVisible = settings.settingsMode ? false : settings.notesPanelVisible;
+
   return (
     <div className="h-full bg-lighter-navy flex flex-col relative">
-      {/* Restart Button */}
-      <div className="absolute top-4 left-4">
-        <button
-          onClick={handleRestartCycle}
-          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label="Restart Cycle"
-        >
-          <span className="text-off-white text-lg">🔄</span>
-        </button>
-      </div>
-
-      {/* Settings Button */}
-      <div className="absolute top-4 right-4">
-        <button
-          onClick={() => setShowSettings(true)}
-          className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-          aria-label="Settings"
-        >
-          <span className="text-off-white text-lg">⚙️</span>
-        </button>
-      </div>
+      {/* Menu Button - Hidden in settings mode */}
+      {!settings.settingsMode && (
+        <div className="absolute left-4 top-4" ref={menuRef}>
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="w-10 h-10 bg-accent-surface hover:bg-accent-surface/80 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            aria-label="Menu"
+          >
+            <svg
+              className="w-5 h-5 text-off-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          
+          {/* Dropdown Menu */}
+          {showMenu && (
+            <div className="absolute top-12 left-0 bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl min-w-[160px] py-2 z-50">
+              {/* Settings */}
+              <button
+                onClick={() => {
+                  enterSettingsMode();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+              >
+                <span className="text-lg">⚙️</span>
+                <span className="text-sm">Settings</span>
+              </button>
+              
+              {/* Restart */}
+              <button
+                onClick={() => {
+                  handleRestartCycle();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+              >
+                <span className="text-lg">🔄</span>
+                <span className="text-sm">Restart Cycle</span>
+              </button>
+              
+              {/* History Toggle */}
+              <button
+                onClick={toggleHistoryPanel}
+                className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+              >
+                <span className="text-lg">📋</span>
+                <span className="text-sm">{settings.historyPanelVisible ? "Hide History" : "Show History"}</span>
+              </button>
+              
+              {/* Notes Toggle */}
+              <button
+                onClick={toggleNotesPanel}
+                className="w-full px-4 py-3 text-left text-off-white hover:bg-accent-surface/50 flex items-center gap-3 transition-colors duration-200"
+              >
+                <span className="text-lg">📝</span>
+                <span className="text-sm">{settings.notesPanelVisible ? "Hide Notes" : "Show Notes"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Timer Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+      <div className={`flex-1 flex flex-col items-center justify-center transition-all duration-300 ${
+        settings.settingsMode ? 'px-8 py-4' : 'px-6 py-2'
+      }`}>
         {/* Phase Indicator */}
-        <div className="mb-2">
-          <h2 className="text-base font-medium text-gray-text text-center">
+        <div className="mb-4">
+          <h2 className={`font-medium text-gray-text text-center transition-all duration-300 ${
+            !effectiveNotesVisible ? 'text-xl' : 'text-base'
+          }`}>
             {getPhaseLabel()}
           </h2>
         </div>
 
-        {/* Countdown Display */}
-        <div className="mb-3">
-          <div className="timer-font text-4xl font-bold text-white">
-            {formatTime(timeLeft)}
+        {settings.historyPanelVisible ? (
+          // Compact layout with timer and controls side by side
+          <div className="flex items-center justify-center gap-8">
+            <div className="flex flex-col items-center">
+              {/* Countdown Display */}
+              <div className="mb-3">
+                <div className={`timer-font font-bold text-off-white transition-all duration-300 ${
+                  !effectiveNotesVisible ? (settings.settingsMode ? 'text-5xl md:text-6xl lg:text-7xl' : 'text-7xl') : 'text-5xl'
+                }`}>
+                  {formatTime(timeLeft)}
+                </div>
+              </div>
+              {/* Round Tracker */}
+              <div>
+                <RoundTracker />
+              </div>
+            </div>
+            
+            {/* Controls */}
+            <div>
+              <Controls compact />
+            </div>
           </div>
-        </div>
+        ) : (
+          // Full layout with timer and controls stacked vertically
+          <>
+            {/* Countdown Display */}
+            <div className="mb-6">
+              <div className={`timer-font font-bold text-off-white transition-all duration-300 ${
+                !effectiveNotesVisible ? (settings.settingsMode ? 'text-6xl md:text-7xl lg:text-8xl' : 'text-8xl') : 'text-6xl'
+              }`}>
+                {formatTime(timeLeft)}
+              </div>
+            </div>
 
-        {/* Round Tracker */}
-        <div className="mb-3">
-          <RoundTracker />
-        </div>
+            {/* Round Tracker */}
+            <div className="mb-6">
+              <RoundTracker />
+            </div>
 
-        {/* Controls */}
-        <Controls />
+            {/* Controls */}
+            <Controls />
+          </>
+        )}
       </div>
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
-      )}
     </div>
   );
 };

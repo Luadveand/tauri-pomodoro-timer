@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { HistoryEntry } from '../types';
 import { useTimerStore } from '../stores/timerStore';
 import { formatTimeFull, getPhaseText, getStatusIcon, getStatusColor } from '../utils/historyHelpers';
@@ -11,37 +11,58 @@ interface HistoryDetailModalProps {
 
 const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, onClose }) => {
   const { restoreFromHistory } = useTimerStore();
+  const [activeSnapshotPageId, setActiveSnapshotPageId] = useState<string | null>(null);
+
+  // Initialize active snapshot page when modal opens with pagesSnapshot
+  useEffect(() => {
+    if (isOpen && entry.pagesSnapshot) {
+      setActiveSnapshotPageId(entry.pagesSnapshot.activePageId);
+    } else if (isOpen) {
+      setActiveSnapshotPageId(null);
+    }
+  }, [isOpen, entry]);
 
   if (!isOpen) return null;
 
-  const renderAllNotes = () => {
-    if (!entry.notesSnapshot) return <p className="text-gray-text/70 text-sm italic">No notes for this session</p>;
-    
-    const lines = entry.notesSnapshot.split('\n');
+  const hasPagesSnapshot = !!entry.pagesSnapshot && entry.pagesSnapshot.pages.length > 0;
+
+  // Get the notes string for the currently viewed page (or legacy notesSnapshot)
+  const getCurrentNotesString = (): string | undefined => {
+    if (hasPagesSnapshot && activeSnapshotPageId) {
+      const page = entry.pagesSnapshot!.pages.find(p => p.id === activeSnapshotPageId);
+      return page?.notes;
+    }
+    return entry.notesSnapshot;
+  };
+
+  const renderNotesFromString = (notes?: string) => {
+    if (!notes) return <p className="text-gray-text/70 text-sm italic">No notes for this session</p>;
+
+    const lines = notes.split('\n');
     if (lines.length === 0) return <p className="text-gray-text/70 text-sm italic">No notes for this session</p>;
-    
+
     return (
       <div className="space-y-1 max-h-60 overflow-y-auto">
         {lines.map((line, index) => {
           const trimmedLine = line.trim();
           if (!trimmedLine) return <div key={index} className="h-2" />;
-          
+
           const isCompleted = trimmedLine.startsWith('✓');
           const isChild = line.startsWith('  ') || line.startsWith('\t');
           const isNote = trimmedLine.startsWith('#');
-          
+
           return (
             <div
               key={index}
               className={`text-sm font-mono cursor-pointer transition-colors flex items-center gap-2 p-1 rounded hover:bg-deep-navy/30 ${
-                isCompleted 
-                  ? 'text-soft-green/90' 
+                isCompleted
+                  ? 'text-soft-green/90'
                   : isNote
                     ? 'text-gray-text/80 italic'
                     : 'text-off-white'
               }`}
               onClick={() => {
-                restoreFromHistory(line, entry.notesSnapshot);
+                restoreFromHistory(line, getCurrentNotesString());
                 onClose();
               }}
               title={`Click to restore: ${line}`}
@@ -66,9 +87,38 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
     );
   };
 
+  const renderPageTabs = () => {
+    if (!hasPagesSnapshot) return null;
+
+    return (
+      <div className="flex overflow-x-auto tab-scrollbar border-b border-gray-text/20 mb-3">
+        {entry.pagesSnapshot!.pages.map((page) => {
+          const isActive = page.id === activeSnapshotPageId;
+          const wasOriginallyActive = page.id === entry.pagesSnapshot!.activePageId;
+          return (
+            <button
+              key={page.id}
+              onClick={() => setActiveSnapshotPageId(page.id)}
+              className={`whitespace-nowrap flex-shrink-0 px-3 py-1.5 text-xs font-mono transition-colors ${
+                isActive
+                  ? 'border-b-2 border-soft-green text-off-white bg-deep-navy/50'
+                  : 'text-gray-text hover:text-off-white hover:bg-deep-navy/30 border-b-2 border-transparent'
+              }`}
+            >
+              {page.name}
+              {wasOriginallyActive && (
+                <span className="ml-1 text-soft-green/60" title="Active page during session">*</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div 
+      <div
         className="bg-lighter-navy border border-gray-text/20 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,13 +146,14 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ entry, isOpen, 
             </button>
           </div>
         </div>
-        
+
         {/* Content */}
         <div className="px-6 py-4">
           <h3 className="text-lg font-medium text-off-white mb-3">Notes & Tasks</h3>
-          {renderAllNotes()}
+          {renderPageTabs()}
+          {renderNotesFromString(getCurrentNotesString())}
         </div>
-        
+
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-text/20 bg-accent-surface/30">
           <p className="text-xs text-gray-text/70">
